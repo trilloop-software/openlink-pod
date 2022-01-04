@@ -1,9 +1,11 @@
 use serde::{Serialize, Deserialize};
 use std::net::SocketAddr;
 use std::time::SystemTime;
+use bincode::{serialize, deserialize};
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct Packet {
+    pub packet_id: String,
     pub version: u8,
     pub source: SocketAddr,
     pub destination: SocketAddr,
