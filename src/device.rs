@@ -1,38 +1,39 @@
+use serde::{Deserialize, Serialize};
+use std::net::Ipv4Addr;
+
+#[derive(Serialize, Deserialize)]
 pub struct Device {
     pub id: String,
     pub name: String,
     pub device_type: DeviceType,
-    pub icon: DeviceTypeIcon,
     pub ip_address: Ipv4Addr,
     pub port: u16,
     pub connection_status: ConnectionStatus,
     pub device_status: DeviceStatus,
-    pub fields: Vec<DeviceFields>
+    pub fields: Vec<DeviceField>
 }
 
+#[derive(Serialize, Deserialize)]
 pub enum DeviceType {
-    Battery = "BATTERY",
-    Inverter = "INVERTER",
-    Sensor = "SENSOR"
+    Battery,
+    Inverter,
+    Sensor
 }
 
-pub enum DeviceTypeIcon {
-    Battery = "battery_full",
-    Inverter = "bolt",
-    Sensor = "speed"
-}
-
+#[derive(Serialize, Deserialize)]
 pub enum ConnectionStatus {
     Disconnected,
     Connected
 }
 
+#[derive(Serialize, Deserialize)]
 pub enum DeviceStatus {
     Unsafe,
     Operational
 }
 
-pub struct DeviceFields {
+#[derive(Serialize, Deserialize)]
+pub struct DeviceField {
     pub field_name: String,
     pub field_value: String
 }

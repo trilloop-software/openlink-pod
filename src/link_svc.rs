@@ -1,16 +1,23 @@
 use anyhow::{anyhow, Result};
+use serde_json;
 use tokio::sync::{mpsc::Receiver, mpsc::Sender};
 
+use super::{device::*};
+
 pub struct LinkSvc {
+    pub device_list: Vec<Device>,
     pub rx: Receiver<String>,
     pub tx: Sender<String>
 }
 
 impl LinkSvc {
+    // main service task for link service
     pub async fn run(mut self) -> Result<()> {
         println!("link_svc running");
+        self.populate_temp_data();
+
         while let Some(_cmd) = self.rx.recv().await {
-            if let Err(e) = self.tx.send(get_device_list()).await {
+            if let Err(e) = self.tx.send(self.get_device_list().unwrap()).await {
                 eprintln!("What the hell just happened: {}", e);
             }
         }
@@ -19,52 +26,50 @@ impl LinkSvc {
 
         Ok(())
     }
-}
 
-fn get_device_list() -> String {
-    let data = r#"
-        [
-            { 
-                "connection_status": 1,
-                "device_status": 1,
-                "device_type": "BATTERY",
-                "fields": [
-                    { "field_name": "Temperature", "field_value": "" },
-                    { "field_name": "Power", "field_value": "" }
-                ],
-                "icon": "battery_full",
-                "id": "yhvlwn1",
-                "ip_address": "127.0.0.1",
-                "name": "Battery 1",
-                "port": 0
-            },
-            { 
-                "connection_status": 1,
-                "device_status": 0,
-                "device_type": "INVERTER",
-                "fields": [
-                    { "field_name": "Inverter Field 1", "field_value": "" },
-                    { "field_name": "Inverter Field 2", "field_value": "" }
-                ],
-                "icon": "bolt",
-                "id": "j5n4ook",
-                "ip_address": "127.0.0.1",
-                "name": "Inverter 1",
-                "port": 0
-            },
-            { 
-                "connection_status": 0,
-                "device_status": 0,
-                "device_type": "SENSOR",
-                "fields": [
-                ],
-                "icon": "speed",
-                "id": "573vxfk",
-                "ip_address": "127.0.0.1",
-                "name": "Sensor 1",
-                "port": 0
-            }
-        ]"#.to_string();
+    fn get_device_list(&self) -> Result<String, serde_json::Error> {
+        serde_json::to_string(&self.device_list)
+    }
 
-    data
+    // temporary function to populate the device list
+    fn populate_temp_data(&mut self) {
+        self.device_list.push(Device { 
+            id: s!("yhvlwn1"),
+            name: s!("Battery 1"),
+            device_type: DeviceType::Battery,
+            ip_address: "127.0.0.1".parse().unwrap(),
+            port: 0,
+            connection_status: ConnectionStatus::Connected,
+            device_status: DeviceStatus::Operational,
+            fields: vec![ 
+                DeviceField { field_name: s!("Temperature"), field_value: s!("") },
+                DeviceField { field_name: s!("Power"), field_value: s!("") }
+            ] 
+        });
+
+        self.device_list.push(Device { 
+            id: s!("j5n4ook"),
+            name: s!("Inverter 1"),
+            device_type: DeviceType::Inverter,
+            ip_address: "127.0.0.1".parse().unwrap(),
+            port: 0,
+            connection_status: ConnectionStatus::Connected,
+            device_status: DeviceStatus::Unsafe,
+            fields: vec![ 
+                DeviceField { field_name: s!("Inverter Field 1"), field_value: s!("") },
+                DeviceField { field_name: s!("Inverter Field 2"), field_value: s!("") }
+            ] 
+        });
+
+        self.device_list.push(Device { 
+            id: s!("573vxfk"),
+            name: s!("Sensor 1"),
+            device_type: DeviceType::Sensor,
+            ip_address: "127.0.0.1".parse().unwrap(),
+            port: 0,
+            connection_status: ConnectionStatus::Disconnected,
+            device_status: DeviceStatus::Unsafe,
+            fields: vec![] 
+        });
+    }
 }
