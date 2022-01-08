@@ -7,8 +7,6 @@ use bincode::{serialize, deserialize};
 pub struct Packet {
     pub packet_id: String,
     pub version: u8,
-    pub source: SocketAddr,
-    pub destination: SocketAddr,
     pub cmd_type: u8,
     pub timestamp: SystemTime,
     pub payload: Vec<String>

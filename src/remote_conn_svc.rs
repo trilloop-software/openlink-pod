@@ -9,12 +9,12 @@ use tokio::sync::{mpsc::Receiver, mpsc::Sender};
 use super::packet::*;
 
 pub struct RemoteConnSvc {
-    pub rx: Receiver<i32>,
-    pub tx: Sender<i32>,
+    pub rx: Receiver<String>,
+    pub tx: Sender<String>,
 }
 
 impl RemoteConnSvc {
-    pub async fn run(self) -> Result<()> {
+    pub async fn run(mut self) -> Result<()> {
         let server_addr = "127.0.0.1:6007".parse().unwrap();
         let (server_config, _server_cert) = self.configure_server().unwrap();
         let (endpoint, mut incoming) = Endpoint::server(server_config, server_addr)?;
@@ -48,7 +48,7 @@ impl RemoteConnSvc {
         Ok((server_config, cert_der))
     }
 
-    async fn handle_connection(&self, conn: quinn::Connecting) -> Result<()> {
+    async fn handle_connection(&mut self, conn: quinn::Connecting) -> Result<()> {
         let quinn::NewConnection {connection: _, mut bi_streams, ..} = conn.await?;
 
         async {
@@ -75,23 +75,27 @@ impl RemoteConnSvc {
         Ok(())
     }
 
-    async fn handle_request(&self, (mut send, recv): (quinn::SendStream, quinn::RecvStream)) -> Result<()> {
+    async fn handle_request(&mut self, (mut send, recv): (quinn::SendStream, quinn::RecvStream)) -> Result<()> {
         let req = recv.read_to_end(64 * 1024).await.map_err(|e| anyhow!("failed reading request: {}", e))?;
         let pkt = decode(req);
-        let resp = self.process_packet(pkt).unwrap_or_else(|e| {
+        let resp = self.process_packet(pkt).await;/*.unwrap_or_else(|e| {
             error!("failed: {}", e);
             format!("failed to process request: {}\n", e).into_bytes()
-        });
+        });*/
 
-        send.write_all(&resp).await.map_err(|e| anyhow!("failed to send response: {}", e))?;
+        send.write_all(&resp.unwrap()).await.map_err(|e| anyhow!("failed to send response: {}", e))?;
         send.finish().await.map_err(|e| anyhow!("failed to shutdown stream: {}", e))?;
         info!("complete!");
 
         Ok(())
     }
 
-    fn process_packet(&self, mut pkt: Packet) -> Result<Vec<u8>> {
+    async fn process_packet(&mut self, mut pkt: Packet) -> Result<Vec<u8>> {
+        self.tx.send("Whatever man".to_string()).await;
+        let resp = self.rx.recv().await;
         pkt.timestamp = std::time::SystemTime::now();
+        pkt.payload.clear();
+        pkt.payload.push(resp.unwrap());
         println!("{:?}", pkt.payload);
         let res = encode(pkt);
     
