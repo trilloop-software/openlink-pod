@@ -17,6 +17,7 @@ impl AuthSvc {
         println!("auth_svc running");
 
         while let Some(pkt) = self.rx_remote.recv().await {
+            // send packet to associated service based on cmd_type field range
             let resp: Packet = match pkt.cmd_type {
                 0..=31 => {
                     // auth service command handling
@@ -55,6 +56,7 @@ impl AuthSvc {
                 }
             };
 
+            // send the modified packet back to remote_conn_svc
             if let Err(e) = self.tx_remote.send(resp).await {
                 eprintln!("auth->remote failed: {}", e)
             }

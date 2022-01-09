@@ -17,11 +17,20 @@ impl LinkSvc {
         self.populate_temp_data();
 
         while let Some(mut pkt) = self.rx.recv().await {
-            if pkt.cmd_type == 32 {
-                pkt.payload.clear();
-                pkt.payload.push(self.get_device_list().unwrap());
-            }
+            // process response based on cmd_type variable
+            let res = match pkt.cmd_type {
+                32 => self.get_device_list().unwrap(),
+                33 => self.add_device(pkt.payload[0].clone()).unwrap(),
+                34 => self.update_device(pkt.payload[0].clone()).unwrap(),
+                35 => self.remove_device(pkt.payload[0].clone()).unwrap(),
+                _ => s!["Command not implemented"]
+            };
 
+            // clear packet payload and add the response to payload vector
+            pkt.payload.clear();
+            pkt.payload.push(res);
+
+            // send modified packet to auth_svc
             if let Err(e) = self.tx.send(pkt).await {
                 eprintln!("link->auth failed: {}", e);
             }
@@ -32,8 +41,37 @@ impl LinkSvc {
         Ok(())
     }
 
+    // add new device to device list
+    // return success message to client
+    fn add_device(&mut self, req: String) -> Result<String, serde_json::Error> {
+        let dev: Device = serde_json::from_str(&req)?;
+        self.device_list.push(dev);
+
+        Ok(s!["Success: Device added."])
+    }
+
     fn get_device_list(&self) -> Result<String, serde_json::Error> {
         serde_json::to_string(&self.device_list)
+    }
+
+    // find device received from client in device list and remove from vector
+    // return success message to client
+    fn remove_device(&mut self, req: String) -> Result<String, serde_json::Error> {
+        let dev: Device = serde_json::from_str(&req)?;
+        let index = self.device_list.iter().position(|d| d.id == dev.id).unwrap();
+        self.device_list.remove(index);
+
+        Ok(s!["Success: Device removed."])
+    }
+
+    // find device received from client in device list and update where id matches
+    // return success message to the client
+    fn update_device(&mut self, req: String) -> Result<String, serde_json::Error> {
+        let dev: Device = serde_json::from_str(&req)?;
+        let index = self.device_list.iter().position(|d| d.id == dev.id).unwrap();
+        self.device_list[index] = dev;
+
+        Ok(s!["Success: Device updated."])
     }
 
     // temporary function to populate the device list
