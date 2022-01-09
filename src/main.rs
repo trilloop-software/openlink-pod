@@ -5,20 +5,35 @@ use tokio::{spawn, sync::{broadcast, mpsc, Mutex}};
 #[macro_use]
 mod macros;
 
+mod auth_svc;
 mod device;
 mod link_svc;
 mod packet;
 mod remote_conn_svc;
 
+use packet::*;
+
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let (remote_in_tx, remote_in_rx) = mpsc::channel::<String>(32);
-    let (remote_out_tx, remote_out_rx) = mpsc::channel::<String>(32);
 
-    let link_svc = link_svc::LinkSvc{ device_list: Vec::new(), rx: remote_out_rx, tx: remote_in_tx };
-    let remote_conn_svc = remote_conn_svc::RemoteConnSvc { rx: remote_in_rx, tx: remote_out_tx };
+    let (tx_auth_to_remote, rx_auth_to_remote) = mpsc::channel::<Packet>(32);
+    let (tx_remote_to_auth, rx_remote_to_auth) = mpsc::channel::<Packet>(32);
 
-    // spawn all services as tasks, and send corresponding control signals
+    let (tx_auth_to_link, rx_auth_to_link) = mpsc::channel::<Packet>(32);
+    let (tx_link_to_auth, rx_link_to_auth) = mpsc::channel::<Packet>(32);
+
+    // create services with necessary control signals
+    let auth_svc = auth_svc::AuthSvc { 
+        rx_remote: rx_remote_to_auth,
+        tx_remote: tx_auth_to_remote,
+        rx_link: rx_link_to_auth,
+        tx_link: tx_auth_to_link
+    };
+    let link_svc = link_svc::LinkSvc{ device_list: Vec::new(), rx: rx_auth_to_link, tx: tx_link_to_auth };
+    let remote_conn_svc = remote_conn_svc::RemoteConnSvc { rx: rx_auth_to_remote, tx: tx_remote_to_auth };
+
+    // spawn all services as tasks
+    spawn(auth_svc.run());
     spawn(link_svc.run());
     spawn(remote_conn_svc.run());
 

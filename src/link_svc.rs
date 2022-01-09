@@ -2,12 +2,12 @@ use anyhow::{anyhow, Result};
 use serde_json;
 use tokio::sync::{mpsc::Receiver, mpsc::Sender};
 
-use super::{device::*};
+use super::{device::*, packet::*};
 
 pub struct LinkSvc {
     pub device_list: Vec<Device>,
-    pub rx: Receiver<String>,
-    pub tx: Sender<String>
+    pub rx: Receiver<Packet>,
+    pub tx: Sender<Packet>
 }
 
 impl LinkSvc {
@@ -16,13 +16,18 @@ impl LinkSvc {
         println!("link_svc running");
         self.populate_temp_data();
 
-        while let Some(_cmd) = self.rx.recv().await {
-            if let Err(e) = self.tx.send(self.get_device_list().unwrap()).await {
-                eprintln!("What the hell just happened: {}", e);
+        while let Some(mut pkt) = self.rx.recv().await {
+            if pkt.cmd_type == 32 {
+                pkt.payload.clear();
+                pkt.payload.push(self.get_device_list().unwrap());
+            }
+
+            if let Err(e) = self.tx.send(pkt).await {
+                eprintln!("link->auth failed: {}", e);
             }
         }
 
-        println!("link_svc done");
+        println!("link_svc down");
 
         Ok(())
     }

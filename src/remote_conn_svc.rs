@@ -9,8 +9,8 @@ use tokio::sync::{mpsc::Receiver, mpsc::Sender};
 use super::packet::*;
 
 pub struct RemoteConnSvc {
-    pub rx: Receiver<String>,
-    pub tx: Sender<String>,
+    pub rx: Receiver<Packet>,
+    pub tx: Sender<Packet>,
 }
 
 impl RemoteConnSvc {
@@ -91,11 +91,10 @@ impl RemoteConnSvc {
     }
 
     async fn process_packet(&mut self, mut pkt: Packet) -> Result<Vec<u8>> {
-        self.tx.send("Whatever man".to_string()).await;
+        self.tx.send(pkt).await;
         let resp = self.rx.recv().await;
+        pkt = resp.unwrap();
         pkt.timestamp = std::time::SystemTime::now();
-        pkt.payload.clear();
-        pkt.payload.push(resp.unwrap());
         println!("{:?}", pkt.payload);
         let res = encode(pkt);
     
