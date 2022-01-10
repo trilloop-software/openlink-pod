@@ -14,7 +14,10 @@ pub struct AuthSvc {
     pub tx_brake: Sender<Packet>,
 
     pub rx_emerg: Receiver<Packet>,
-    pub tx_emerg: Sender<Packet>
+    pub tx_emerg: Sender<Packet>,
+    
+    pub rx_launch: Receiver<Packet>,
+    pub tx_launch: Sender<Packet>
 }
 
 impl AuthSvc {
@@ -39,7 +42,12 @@ impl AuthSvc {
                 },
                 64..=95 => {
                     // launch service command handling
-                    pkt
+                    if let Err(e) = self.tx_launch.send(pkt).await {
+                        eprintln!("auth->launch failed: {}", e);
+                    }
+                    self.rx_launch.recv().await.unwrap()
+
+                    //pkt
                 },
                 96..=127 => {
                     // brake service command handling
