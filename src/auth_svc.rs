@@ -6,8 +6,12 @@ use super::packet::*;
 pub struct AuthSvc {
     pub rx_remote: Receiver<Packet>,
     pub tx_remote: Sender<Packet>,
+
     pub rx_link: Receiver<Packet>,
-    pub tx_link: Sender<Packet>
+    pub tx_link: Sender<Packet>,
+
+    pub rx_brake: Receiver<Packet>,
+    pub tx_brake: Sender<Packet>
 }
 
 impl AuthSvc {
@@ -36,7 +40,10 @@ impl AuthSvc {
                 },
                 96..=127 => {
                     // brake service command handling
-                    pkt
+                    if let Err(e) = self.tx_brake.send(pkt).await {
+                        eprintln!("auth->brake failed: {}", e);
+                    }
+                    self.rx_brake.recv().await.unwrap()
                 },
                 128..=159 => {
                     // telemetry service command handling
