@@ -12,6 +12,7 @@ mod packet;
 mod remote_conn_svc;
 mod brake_svc;
 mod emerg_svc;
+mod launch_svc;
 use packet::*;
 
 #[tokio::main]
@@ -42,6 +43,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let (tx_auth_to_emerg, rx_auth_to_emerg) = mpsc::channel::<Packet>(32);
     let (tx_emerg_to_auth, rx_emerg_to_auth) = mpsc::channel::<Packet>(32);
 
+    //auth-launch
+    let (tx_auth_to_launch, rx_auth_to_launch) = mpsc::channel::<Packet>(32);
+    let (tx_launch_to_auth, rx_launch_to_auth) = mpsc::channel::<Packet>(32);
+
     // create services with necessary control signals
     let auth_svc = auth_svc::AuthSvc { 
         rx_remote: rx_remote_to_auth,
@@ -54,7 +59,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         tx_brake: tx_auth_to_brake,
 
         rx_emerg: rx_emerg_to_auth,
-        tx_emerg: tx_auth_to_emerg
+        tx_emerg: tx_auth_to_emerg,
+
+        rx_launch: rx_launch_to_auth,
+        tx_launch: tx_auth_to_launch
     };
 
     let brake_svc = brake_svc::BrakeSvc {
@@ -79,12 +87,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let link_svc = link_svc::LinkSvc{ device_list: Vec::new(), rx: rx_auth_to_link, tx: tx_link_to_auth };
     let remote_conn_svc = remote_conn_svc::RemoteConnSvc { rx: rx_auth_to_remote, tx: tx_remote_to_auth };
 
+    let launch_svc = launch_svc::LaunchSvc{rx: rx_auth_to_launch, tx: tx_launch_to_auth};
+
     // spawn all services as tasks
     spawn(auth_svc.run());
     spawn(link_svc.run());
     spawn(remote_conn_svc.run());
     spawn(brake_svc.run());
     spawn(emerg_svc.run());
+    spawn(launch_svc.run());
 
     loop {
 
