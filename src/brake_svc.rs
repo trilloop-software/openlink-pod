@@ -22,8 +22,9 @@ impl BrakeSvc
         loop
         {
             tokio::select!{
-                val = self.rx_auth.recv() => {
-                    println!("Auth->Brake received");
+                val = self.rx_auth.recv() => { //there should be a better way to do this, via a function call or something, but every time I try to do it I run into borrowing/mutability/lifetime issues
+                    //if anyone else has an idea on how to solve that, give it a try.
+                    println!("Auth->Brake received"); 
                     let res = Packet {
                         packet_id: s!["OPENLINK"],
                         version: 1,

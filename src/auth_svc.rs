@@ -11,7 +11,10 @@ pub struct AuthSvc {
     pub tx_link: Sender<Packet>,
 
     pub rx_brake: Receiver<Packet>,
-    pub tx_brake: Sender<Packet>
+    pub tx_brake: Sender<Packet>,
+
+    pub rx_emerg: Receiver<Packet>,
+    pub tx_emerg: Sender<Packet>
 }
 
 impl AuthSvc {
@@ -55,11 +58,18 @@ impl AuthSvc {
                 },
                 196..=227 => {
                     // extra?
+                    // 
                     pkt
                 },
-                228..=255 => {
+                228..=254 => {
                     // extra?
                     pkt
+                },
+                255..=255 => { //emergency command
+                    if let Err(e) = self.tx_emerg.send(pkt).await {
+                        eprintln!("auth->emerg failed: {}", e);
+                    }
+                    self.rx_emerg.recv().await.unwrap()
                 }
             };
 
