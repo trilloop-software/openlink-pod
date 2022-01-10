@@ -1,4 +1,4 @@
-use anyhow::{anyhow, Result};
+use anyhow::{/*anyhow, */Result};
 use serde_json;
 use tokio::sync::{mpsc::Receiver, mpsc::Sender};
 
@@ -44,22 +44,27 @@ impl LinkSvc {
     // add new device to device list
     // return success message to client
     fn add_device(&mut self, req: String) -> Result<String, serde_json::Error> {
+        println!("add_device command received");
         let dev: Device = serde_json::from_str(&req)?;
         self.device_list.push(dev);
+        println!("success: device added");
 
         Ok(s!["Success: Device added."])
     }
 
     fn get_device_list(&self) -> Result<String, serde_json::Error> {
+        println!("get_device_list command received");
         serde_json::to_string(&self.device_list)
     }
 
     // find device received from client in device list and remove from vector
     // return success message to client
     fn remove_device(&mut self, req: String) -> Result<String, serde_json::Error> {
+        println!("remove_device command received");
         let dev: Device = serde_json::from_str(&req)?;
         let index = self.device_list.iter().position(|d| d.id == dev.id).unwrap();
         self.device_list.remove(index);
+        println!("success: device removed");
 
         Ok(s!["Success: Device removed."])
     }
@@ -67,9 +72,11 @@ impl LinkSvc {
     // find device received from client in device list and update where id matches
     // return success message to the client
     fn update_device(&mut self, req: String) -> Result<String, serde_json::Error> {
+        println!("update_device command received");
         let dev: Device = serde_json::from_str(&req)?;
         let index = self.device_list.iter().position(|d| d.id == dev.id).unwrap();
         self.device_list[index] = dev;
+        println!("success: device updated");
 
         Ok(s!["Success: Device updated."])
     }

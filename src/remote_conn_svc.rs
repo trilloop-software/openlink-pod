@@ -52,11 +52,11 @@ impl RemoteConnSvc {
         let quinn::NewConnection {connection: _, mut bi_streams, ..} = conn.await?;
 
         async {
-            println!("established");
+            info!("established");
             while let Some(stream) = bi_streams.next().await {
                 let stream = match stream {
                     Err(quinn::ConnectionError::ApplicationClosed { .. }) => {
-                        println!("connection closed");
+                        info!("connection closed");
                         return Ok(());
                     }
                     Err(e) => {
@@ -78,10 +78,7 @@ impl RemoteConnSvc {
     async fn handle_request(&mut self, (mut send, recv): (quinn::SendStream, quinn::RecvStream)) -> Result<()> {
         let req = recv.read_to_end(64 * 1024).await.map_err(|e| anyhow!("failed reading request: {}", e))?;
         let pkt = decode(req);
-        let resp = self.process_packet(pkt).await;/*.unwrap_or_else(|e| {
-            error!("failed: {}", e);
-            format!("failed to process request: {}\n", e).into_bytes()
-        });*/
+        let resp = self.process_packet(pkt).await;
 
         send.write_all(&resp.unwrap()).await.map_err(|e| anyhow!("failed to send response: {}", e))?;
         send.finish().await.map_err(|e| anyhow!("failed to shutdown stream: {}", e))?;
@@ -90,12 +87,26 @@ impl RemoteConnSvc {
         Ok(())
     }
 
-    async fn process_packet(&mut self, mut pkt: Packet) -> Result<Vec<u8>> {
-        self.tx.send(pkt).await;
-        let resp = self.rx.recv().await;
-        pkt = resp.unwrap();
-        pkt.timestamp = std::time::SystemTime::now();
-        println!("{:?}", pkt.payload);
+    async fn process_packet(&mut self, pkt: Packet) -> Result<Vec<u8>> {
+        let pkt = match self.tx.send(pkt).await {
+            Ok(()) => {
+                let resp = self.rx.recv().await;
+                let mut pkt = resp.unwrap();
+                pkt.timestamp = std::time::SystemTime::now();
+                pkt
+            },
+            Err(e) => {
+                let pkt = Packet {
+                    packet_id: s!["OPENLINK"],
+                    version: 1,
+                    cmd_type: 0,
+                    timestamp: std::time::SystemTime::now(),
+                    payload: vec![s![e]]
+                };
+                pkt
+            }
+        };
+        
         let res = encode(pkt);
     
         Ok(res)

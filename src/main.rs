@@ -1,6 +1,6 @@
 use anyhow::Result;
-use std::sync::Arc;
-use tokio::{spawn, sync::{broadcast, mpsc, Mutex}};
+//use std::sync::Arc;
+use tokio::{spawn, sync::{/*broadcast,*/ mpsc/*, Mutex*/}};
 
 #[macro_use]
 mod macros;
@@ -16,6 +16,7 @@ use packet::*;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // create control signals to communicate between services
 
     //auth-remote
     let (tx_auth_to_remote, rx_auth_to_remote) = mpsc::channel::<Packet>(32);
@@ -56,24 +57,24 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         tx_emerg: tx_auth_to_emerg
     };
 
-let brake_svc = brake_svc::BrakeSvc {
-        rx_auth: rx_auth_to_brake,
-        tx_auth: tx_brake_to_auth,
+    let brake_svc = brake_svc::BrakeSvc {
+            rx_auth: rx_auth_to_brake,
+            tx_auth: tx_brake_to_auth,
 
-        rx_emerg: rx_emerg_to_brake, 
-        tx_emerg: tx_brake_to_emerg,
+            rx_emerg: rx_emerg_to_brake, 
+            tx_emerg: tx_brake_to_emerg,
 
-        rx_launch: rx_launch_to_break,
-        tx_launch: tx_brake_to_launch
+            rx_launch: rx_launch_to_break,
+            tx_launch: tx_brake_to_launch
+        };
+
+    let emerg_svc = emerg_svc::EmergSvc {
+        rx_auth: rx_auth_to_emerg,
+        tx_auth: tx_emerg_to_auth,
+
+        rx_brake: rx_brake_to_emerg,
+        tx_brake: tx_emerg_to_brake
     };
-
-let emerg_svc = emerg_svc::EmergSvc {
-    rx_auth: rx_auth_to_emerg,
-    tx_auth: tx_emerg_to_auth,
-
-    rx_brake: rx_brake_to_emerg,
-    tx_brake: tx_emerg_to_brake
-};
 
     let link_svc = link_svc::LinkSvc{ device_list: Vec::new(), rx: rx_auth_to_link, tx: tx_link_to_auth };
     let remote_conn_svc = remote_conn_svc::RemoteConnSvc { rx: rx_auth_to_remote, tx: tx_remote_to_auth };

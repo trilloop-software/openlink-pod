@@ -1,5 +1,5 @@
 use anyhow::{Result};
-use tokio::{spawn, sync::{broadcast, mpsc::Receiver, mpsc::Sender, Mutex}};
+use tokio::{/*spawn, */sync::{/*broadcast, */mpsc::Receiver, mpsc::Sender/*, Mutex*/}};
 
 //right now it looks like emergency service only receives commands from auth
 //but I will still set it up so that it can receive commands from multiple services, just in case.
@@ -26,7 +26,7 @@ impl EmergSvc
         loop //same concept as brake_svc from here out
         {
             tokio::select!{
-                val = self.rx_auth.recv() => {
+                _val = self.rx_auth.recv() => {
                     println!("Auth->Emerg received");
                     let pkt = Packet { //packet to send to brake_svc
                         packet_id: s!["OPENLINK"],
@@ -37,7 +37,7 @@ impl EmergSvc
                     };
 
                     match self.tx_brake.send(pkt).await{ //send to brake and get response, then send response back to auth
-                        Ok(pack) => { //send it back to auth
+                        Ok(()) => { //send it back to auth
                             let res = self.rx_brake.recv().await.unwrap();
                             if let Err(e) = self.tx_auth.send(res).await {
                                 eprintln!("Brake->Auth failed: {}", e);
