@@ -66,15 +66,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     };
 
     let brake_svc = brake_svc::BrakeSvc {
-            rx_auth: rx_auth_to_brake,
-            tx_auth: tx_brake_to_auth,
+        rx_auth: rx_auth_to_brake,
+        tx_auth: tx_brake_to_auth,
 
-            rx_emerg: rx_emerg_to_brake, 
-            tx_emerg: tx_brake_to_emerg,
+        rx_emerg: rx_emerg_to_brake, 
+        tx_emerg: tx_brake_to_emerg,
 
-            rx_launch: rx_launch_to_break,
-            tx_launch: tx_brake_to_launch
-        };
+        rx_launch: rx_launch_to_break,
+        tx_launch: tx_brake_to_launch
+    };
 
     let emerg_svc = emerg_svc::EmergSvc {
         rx_auth: rx_auth_to_emerg,
@@ -84,10 +84,24 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         tx_brake: tx_emerg_to_brake
     };
 
-    let link_svc = link_svc::LinkSvc{ device_list: Vec::new(), rx: rx_auth_to_link, tx: tx_link_to_auth };
-    let remote_conn_svc = remote_conn_svc::RemoteConnSvc { rx: rx_auth_to_remote, tx: tx_remote_to_auth };
+    let launch_svc = launch_svc::LaunchSvc { 
+        rx_auth: rx_auth_to_launch, 
+        tx_auth: tx_launch_to_auth,
 
-    let launch_svc = launch_svc::LaunchSvc{rx: rx_auth_to_launch, tx: tx_launch_to_auth};
+        rx_brake: rx_brake_to_launch,
+        tx_brake: tx_launch_to_break,
+    };
+
+    let link_svc = link_svc::LinkSvc { 
+        device_list: Vec::new(), 
+        rx: rx_auth_to_link, 
+        tx: tx_link_to_auth 
+    };
+
+    let remote_conn_svc = remote_conn_svc::RemoteConnSvc { 
+        rx: rx_auth_to_remote, 
+        tx: tx_remote_to_auth
+    };
 
     // spawn all services as tasks
     spawn(auth_svc.run());

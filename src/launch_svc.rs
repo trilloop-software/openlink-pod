@@ -1,14 +1,13 @@
 use anyhow::{Result};
-use tokio::{spawn, sync::{broadcast, mpsc::Receiver, mpsc::Sender, Mutex}};
+use tokio::{/*spawn,*/ sync::{/*broadcast, */mpsc::Receiver, mpsc::Sender/*, Mutex*/}};
 
 use super::{packet::*};
 
 pub struct LaunchSvc {
-    pub rx_auth: Receiver<Packet>;
-    pub tx_auth: Sender<Packet>;
-
-
-    //
+    pub rx_auth: Receiver<Packet>,
+    pub tx_auth: Sender<Packet>,
+    pub rx_brake: Receiver<Packet>,
+    pub tx_brake: Sender<Packet>
 }
 
 impl LaunchSvc {
@@ -19,7 +18,7 @@ impl LaunchSvc {
 
         loop {
             tokio::select!{ // mmight have to add brake svc
-                val = self.rx_auth.recv() => {
+                _val = self.rx_auth.recv() => {
                     let response_ = Packet {
                         packet_id: s!["OPENLINK"],
                         version: 1,
