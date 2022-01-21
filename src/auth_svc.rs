@@ -21,8 +21,8 @@ pub struct AuthSvc {
 }
 
 impl AuthSvc {
-    // main service task for auth service
-    // utilizing as command parser for now since all commands will require authentication in the future
+    /// Main service task for auth service
+    /// Utilizing as command parser for now since all commands will require authentication in the future
     pub async fn run(mut self) -> Result<()> {
         println!("auth_svc running");
 

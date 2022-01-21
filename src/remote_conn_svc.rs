@@ -14,6 +14,8 @@ pub struct RemoteConnSvc {
 }
 
 impl RemoteConnSvc {
+    /// Main service function for remote_conn_svc
+    /// Open UDP socket and start listening for QUIC connections
     pub async fn run(mut self) -> Result<()> {
         let server_addr = "127.0.0.1:6007".parse().unwrap();
         let (server_config, _server_cert) = self.configure_server().unwrap();
@@ -24,13 +26,14 @@ impl RemoteConnSvc {
             info!("remote client connecting from {}", conn.remote_address());
             let fut = self.handle_connection(conn);
             if let Err(e) = fut.await {
-                error!("connection failed: {}", e.to_string())
+                error!("connection failed: {}", e.to_string());
             }
         }
 
         Ok(())
     }
 
+    /// Generates the TLS certificate and other server configurations parameters
     #[allow(clippy::field_reassign_with_default)]
     fn configure_server(&self) -> Result<(ServerConfig, Vec<u8>), Box<dyn Error>> {
         let cert = rcgen::generate_simple_self_signed(vec!["localhost".into()]).unwrap();
@@ -42,12 +45,13 @@ impl RemoteConnSvc {
         let mut server_config = ServerConfig::with_single_cert(cert_chain, priv_key)?;
         Arc::get_mut(&mut server_config.transport)
             .unwrap()
-            .max_concurrent_uni_streams(0_u8.into())
-            .keep_alive_interval(std::time::Duration::new(5,0).into());
+            .max_concurrent_uni_streams(0_u8.into())                // force bidirectional streams
+            .keep_alive_interval(std::time::Duration::new(5,0).into());    // not necessarily used now but will be useful for future heartbeat functionality
 
         Ok((server_config, cert_der))
     }
 
+    /// Takes a connecting client and establishes send and receive streams
     async fn handle_connection(&mut self, conn: quinn::Connecting) -> Result<()> {
         let quinn::NewConnection {connection: _, mut bi_streams, ..} = conn.await?;
 
@@ -75,18 +79,34 @@ impl RemoteConnSvc {
         Ok(())
     }
 
+    /// Receive request from RecvStream
+    /// Decode buffer into valid OpenLink Packet
+    /// Send response on SendStream
     async fn handle_request(&mut self, (mut send, recv): (quinn::SendStream, quinn::RecvStream)) -> Result<()> {
-        let req = recv.read_to_end(64 * 1024).await.map_err(|e| anyhow!("failed reading request: {}", e))?;
+        let req = recv.read_to_end(64 * 1024)
+            .await
+            .map_err(|e| anyhow!("failed reading request: {}", e))?;
+
         let pkt = decode(req);
         let resp = self.process_packet(pkt).await;
 
-        send.write_all(&resp.unwrap()).await.map_err(|e| anyhow!("failed to send response: {}", e))?;
-        send.finish().await.map_err(|e| anyhow!("failed to shutdown stream: {}", e))?;
+        send.write_all(&resp.unwrap())
+            .await
+            .map_err(|e| anyhow!("failed to send response: {}", e))?;
+
+        send.finish()
+            .await
+            .map_err(|e| anyhow!("failed to shutdown stream: {}", e))?;
+
         info!("complete!");
 
         Ok(())
     }
 
+    /// Send the packet to the auth service
+    /// Receive the result from the auth service and update timestamp
+    /// If request to auth_svc errored, return the error as the payload and update timestamp
+    /// Return packet as buffer
     async fn process_packet(&mut self, pkt: Packet) -> Result<Vec<u8>> {
         let pkt = match self.tx.send(pkt).await {
             Ok(()) => {

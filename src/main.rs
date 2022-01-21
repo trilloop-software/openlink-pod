@@ -17,37 +17,37 @@ use packet::*;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // create control signals to communicate between services
+    // Create control signals to communicate between services
 
-    //auth-remote
+    // auth-remote
     let (tx_auth_to_remote, rx_auth_to_remote) = mpsc::channel::<Packet>(32);
     let (tx_remote_to_auth, rx_remote_to_auth) = mpsc::channel::<Packet>(32);
 
-    //auth-link
+    // auth-link
     let (tx_auth_to_link, rx_auth_to_link) = mpsc::channel::<Packet>(32);
     let (tx_link_to_auth, rx_link_to_auth) = mpsc::channel::<Packet>(32);
 
-    //brake-auth
+    // brake-auth
     let (tx_brake_to_auth, rx_brake_to_auth) = mpsc::channel::<Packet>(32);
     let (tx_auth_to_brake, rx_auth_to_brake) = mpsc::channel::<Packet>(32);
 
-    //brake-emerg
+    // brake-emerg
     let (tx_brake_to_emerg, rx_brake_to_emerg) = mpsc::channel::<Packet>(32);
     let (tx_emerg_to_brake, rx_emerg_to_brake) = mpsc::channel::<Packet>(32);
 
-    //brake-launch
+    // brake-launch
     let (tx_brake_to_launch, rx_brake_to_launch) = mpsc::channel::<Packet>(32);
     let (tx_launch_to_break, rx_launch_to_break) = mpsc::channel::<Packet>(32);
 
-    //auth-emerg
+    // auth-emerg
     let (tx_auth_to_emerg, rx_auth_to_emerg) = mpsc::channel::<Packet>(32);
     let (tx_emerg_to_auth, rx_emerg_to_auth) = mpsc::channel::<Packet>(32);
 
-    //auth-launch
+    // auth-launch
     let (tx_auth_to_launch, rx_auth_to_launch) = mpsc::channel::<Packet>(32);
     let (tx_launch_to_auth, rx_launch_to_auth) = mpsc::channel::<Packet>(32);
 
-    // create services with necessary control signals
+    // Create services with necessary control signals
     let auth_svc = auth_svc::AuthSvc { 
         rx_remote: rx_remote_to_auth,
         tx_remote: tx_auth_to_remote,
@@ -103,7 +103,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         tx: tx_remote_to_auth
     };
 
-    // spawn all services as tasks
+    // Spawn all services as tasks
     spawn(auth_svc.run());
     spawn(link_svc.run());
     spawn(remote_conn_svc.run());
