@@ -11,7 +11,7 @@ pub struct LinkSvc {
 }
 
 impl LinkSvc {
-    // main service task for link service
+    /// Main service task for link service
     pub async fn run(mut self) -> Result<()> {
         println!("link_svc running");
         self.populate_temp_data();
@@ -41,8 +41,8 @@ impl LinkSvc {
         Ok(())
     }
 
-    // add new device to device list
-    // return success message to client
+    /// Add new device to device list
+    /// Return success message to client
     fn add_device(&mut self, req: String) -> Result<String, serde_json::Error> {
         println!("add_device command received");
         let dev: Device = serde_json::from_str(&req)?;
@@ -57,8 +57,8 @@ impl LinkSvc {
         serde_json::to_string(&self.device_list)
     }
 
-    // find device received from client in device list and remove from vector
-    // return success message to client
+    /// Find device received from client in device list and remove from vector
+    /// Return success message to client
     fn remove_device(&mut self, req: String) -> Result<String, serde_json::Error> {
         println!("remove_device command received");
         let dev: Device = serde_json::from_str(&req)?;
@@ -69,8 +69,8 @@ impl LinkSvc {
         Ok(s!["Success: Device removed."])
     }
 
-    // find device received from client in device list and update where id matches
-    // return success message to the client
+    /// Find device received from client in device list and update where id matches
+    /// Return success message to the client
     fn update_device(&mut self, req: String) -> Result<String, serde_json::Error> {
         println!("update_device command received");
         let dev: Device = serde_json::from_str(&req)?;
@@ -81,7 +81,7 @@ impl LinkSvc {
         Ok(s!["Success: Device updated."])
     }
 
-    // temporary function to populate the device list
+    /// Temporary function to populate the device list
     fn populate_temp_data(&mut self) {
         self.device_list.push(Device { 
             id: s!("yhvlwn1"),
