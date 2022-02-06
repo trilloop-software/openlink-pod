@@ -23,7 +23,7 @@ impl RemoteConnSvc {
         println!("remote_conn_svc running on {}", endpoint.local_addr()?);
 
         while let Some(conn) = incoming.next().await {
-            info!("remote client connecting from {}", conn.remote_address());
+            println!("remote client connecting from {}", conn.remote_address());
             let fut = self.handle_connection(conn);
             if let Err(e) = fut.await {
                 error!("connection failed: {}", e.to_string());

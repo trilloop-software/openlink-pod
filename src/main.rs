@@ -48,7 +48,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let (tx_launch_to_auth, rx_launch_to_auth) = mpsc::channel::<Packet>(32);
 
     // Create services with necessary control signals
-    let auth_svc = auth_svc::AuthSvc { 
+    let auth_svc = auth_svc::AuthSvc {
         rx_remote: rx_remote_to_auth,
         tx_remote: tx_auth_to_remote,
 
