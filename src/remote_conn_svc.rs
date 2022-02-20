@@ -83,22 +83,29 @@ impl RemoteConnSvc {
     /// Decode buffer into valid OpenLink Packet
     /// Send response on SendStream
     async fn handle_request(&mut self, (mut send, recv): (quinn::SendStream, quinn::RecvStream)) -> Result<()> {
-        let req = recv.read_to_end(64 * 1024)
-            .await
-            .map_err(|e| anyhow!("failed reading request: {}", e))?;
+        let req = match recv.read_to_end(64 * 1024).await {
+            Ok(req) => req,
+            Err(e) => encode(Packet::new(0, vec![s!(e)]))
+        };
 
         let pkt = decode(req);
-        let resp = self.process_packet(pkt).await;
+        let resp: Vec<u8>;
 
-        send.write_all(&resp.unwrap())
-            .await
-            .map_err(|e| anyhow!("failed to send response: {}", e))?;
+        if pkt.cmd_type == 0 {
+            resp = encode(pkt);
+        } else {
+            resp = self.process_packet(pkt).await.unwrap();
+        }
 
-        send.finish()
-            .await
-            .map_err(|e| anyhow!("failed to shutdown stream: {}", e))?;
+        match send.write_all(&resp).await {
+            Ok(()) => (),
+            Err(e) => println!("failed to send response: {}", s!(e))
+        }
 
-        info!("complete!");
+        match send.finish().await {
+            Ok(()) => (),
+            Err(e) => println!("failed to shutdown stream: {}", s!(e))
+        }
 
         Ok(())
     }
@@ -110,20 +117,11 @@ impl RemoteConnSvc {
     async fn process_packet(&mut self, pkt: Packet) -> Result<Vec<u8>> {
         let pkt = match self.tx.send(pkt).await {
             Ok(()) => {
-                let resp = self.rx.recv().await;
-                let mut pkt = resp.unwrap();
-                pkt.timestamp = std::time::SystemTime::now();
-                pkt
+                let resp = self.rx.recv().await.unwrap();
+                Packet::new(resp.cmd_type, resp.payload)
             },
             Err(e) => {
-                let pkt = Packet {
-                    packet_id: s!["OPENLINK"],
-                    version: 1,
-                    cmd_type: 0,
-                    timestamp: std::time::SystemTime::now(),
-                    payload: vec![s![e]]
-                };
-                pkt
+                Packet::new(0, vec![s!(e)])
             }
         };
         
