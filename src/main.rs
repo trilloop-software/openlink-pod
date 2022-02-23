@@ -65,6 +65,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let pod_stats = pod_state_svc::PodStatus{
         is_moving : false,
         brakes_engaged: false,
+        is_locked: false
     };
 
     let pod_state_svc = pod_state_svc::PodStateSvc { 

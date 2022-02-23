@@ -18,6 +18,7 @@ pub struct PodStatus
 {
     pub brakes_engaged : bool,
     pub is_moving : bool,
+    pub is_locked : bool,
 }
 
 pub struct PodStateSvc{ 
@@ -41,8 +42,6 @@ impl PodStateSvc
     pub async fn run(mut self) -> Result<()> {
         println!("pod_state_svc running");
         //some default values
-        self.pod_status.is_moving = false;
-        self.pod_status.brakes_engaged = false;
 
         loop {
             tokio::select!{
@@ -139,13 +138,23 @@ impl PodStateSvc
     
     fn launch_pod(&mut self) -> Result<Packet, serde_json::Error>
     {
+        if !self.pod_status.is_locked
+        {
+            return Ok(Packet{
+            packet_id: s!["OPENLINK"],
+            version: 1,
+            cmd_type: 69,
+            timestamp: std::time::SystemTime::now(),
+            payload: vec!["Pod not launched, devices not yet locked".to_string()]
+            })
+        }
         self.pod_status.brakes_engaged = false;
         self.pod_status.is_moving = true;
 
         let res = Packet { //default packet
             packet_id: s!["OPENLINK"],
             version: 1,
-            cmd_type: 65,
+            cmd_type: 69,
             timestamp: std::time::SystemTime::now(),
             payload: vec!["Pod launched".to_string()]
         };
