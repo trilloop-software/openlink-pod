@@ -10,9 +10,8 @@ mod device;
 mod link_svc;
 mod packet;
 mod remote_conn_svc;
-mod brake_svc;
 mod emerg_svc;
-mod launch_svc;
+mod pod_state_svc;
 use packet::*;
 
 #[tokio::main]
@@ -27,25 +26,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let (tx_auth_to_link, rx_auth_to_link) = mpsc::channel::<Packet>(32);
     let (tx_link_to_auth, rx_link_to_auth) = mpsc::channel::<Packet>(32);
 
-    // brake-auth
-    let (tx_brake_to_auth, rx_brake_to_auth) = mpsc::channel::<Packet>(32);
-    let (tx_auth_to_brake, rx_auth_to_brake) = mpsc::channel::<Packet>(32);
-
-    // brake-emerg
-    let (tx_brake_to_emerg, rx_brake_to_emerg) = mpsc::channel::<Packet>(32);
-    let (tx_emerg_to_brake, rx_emerg_to_brake) = mpsc::channel::<Packet>(32);
-
-    // brake-launch
-    let (tx_brake_to_launch, rx_brake_to_launch) = mpsc::channel::<Packet>(32);
-    let (tx_launch_to_break, rx_launch_to_break) = mpsc::channel::<Packet>(32);
+    // pod_status-emerg
+    let (tx_pod_status_to_emerg, rx_pod_status_to_emerg) = mpsc::channel::<Packet>(32);
+    let (tx_emerg_to_pod_status, rx_emerg_to_pod_status) = mpsc::channel::<Packet>(32);
 
     // auth-emerg
     let (tx_auth_to_emerg, rx_auth_to_emerg) = mpsc::channel::<Packet>(32);
     let (tx_emerg_to_auth, rx_emerg_to_auth) = mpsc::channel::<Packet>(32);
 
-    // auth-launch
-    let (tx_auth_to_launch, rx_auth_to_launch) = mpsc::channel::<Packet>(32);
-    let (tx_launch_to_auth, rx_launch_to_auth) = mpsc::channel::<Packet>(32);
+    // auth-pod_status
+    let (tx_auth_to_pod_status, rx_auth_to_pod_status) = mpsc::channel::<Packet>(32);
+    let (tx_pod_status_to_auth, rx_pod_status_to_auth) = mpsc::channel::<Packet>(32);
 
     // Create services with necessary control signals
     let auth_svc = auth_svc::AuthSvc {
@@ -55,41 +46,35 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         rx_link: rx_link_to_auth,
         tx_link: tx_auth_to_link,
 
-        rx_brake: rx_brake_to_auth,
-        tx_brake: tx_auth_to_brake,
+        rx_pod_status: rx_pod_status_to_auth,
+        tx_pod_status: tx_auth_to_pod_status,
 
         rx_emerg: rx_emerg_to_auth,
         tx_emerg: tx_auth_to_emerg,
-
-        rx_launch: rx_launch_to_auth,
-        tx_launch: tx_auth_to_launch
-    };
-
-    let brake_svc = brake_svc::BrakeSvc {
-        rx_auth: rx_auth_to_brake,
-        tx_auth: tx_brake_to_auth,
-
-        rx_emerg: rx_emerg_to_brake, 
-        tx_emerg: tx_brake_to_emerg,
-
-        rx_launch: rx_launch_to_break,
-        tx_launch: tx_brake_to_launch
     };
 
     let emerg_svc = emerg_svc::EmergSvc {
         rx_auth: rx_auth_to_emerg,
         tx_auth: tx_emerg_to_auth,
 
-        rx_brake: rx_brake_to_emerg,
-        tx_brake: tx_emerg_to_brake
+        rx_pod_status: rx_pod_status_to_emerg,
+        tx_pod_status: tx_emerg_to_pod_status
     };
 
-    let launch_svc = launch_svc::LaunchSvc { 
-        rx_auth: rx_auth_to_launch, 
-        tx_auth: tx_launch_to_auth,
+    //pod status defaults
+    let pod_stats = pod_state_svc::PodStatus{
+        is_moving : false,
+        brakes_engaged: false,
+    };
 
-        rx_brake: rx_brake_to_launch,
-        tx_brake: tx_launch_to_break,
+    let pod_state_svc = pod_state_svc::PodStateSvc { 
+        pod_status: pod_stats,
+
+        rx_auth: rx_auth_to_pod_status, 
+        tx_auth: tx_pod_status_to_auth,
+
+        rx_emerg: rx_emerg_to_pod_status,
+        tx_emerg: tx_pod_status_to_emerg,
     };
 
     let link_svc = link_svc::LinkSvc { 
@@ -107,9 +92,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     spawn(auth_svc.run());
     spawn(link_svc.run());
     spawn(remote_conn_svc.run());
-    spawn(brake_svc.run());
     spawn(emerg_svc.run());
-    spawn(launch_svc.run());
+    spawn(pod_state_svc.run());
 
     loop {
 
