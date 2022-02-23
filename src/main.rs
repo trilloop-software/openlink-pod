@@ -13,6 +13,7 @@ mod remote_conn_svc;
 mod brake_svc;
 mod emerg_svc;
 mod launch_svc;
+mod pod_conn_svc;
 use packet::*;
 
 #[tokio::main]
@@ -46,6 +47,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // auth-launch
     let (tx_auth_to_launch, rx_auth_to_launch) = mpsc::channel::<Packet>(32);
     let (tx_launch_to_auth, rx_launch_to_auth) = mpsc::channel::<Packet>(32);
+
+    // link-pod
+    let (tx_link_to_pod, rx_link_to_pod) = mpsc::channel::<Vec<device::Device>>(32);
+    let (tx_pod_to_link, rx_pod_to_link) = mpsc::channel::<Vec<device::Device>>(32);
 
     // Create services with necessary control signals
     let auth_svc = auth_svc::AuthSvc {
@@ -94,8 +99,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let link_svc = link_svc::LinkSvc { 
         device_list: Vec::new(), 
-        rx: rx_auth_to_link, 
-        tx: tx_link_to_auth 
+        rx_auth: rx_auth_to_link,
+        tx_auth: tx_link_to_auth,
+        rx_pod: rx_pod_to_link,
+        tx_pod: tx_link_to_pod,
     };
 
     let remote_conn_svc = remote_conn_svc::RemoteConnSvc { 

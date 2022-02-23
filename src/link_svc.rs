@@ -6,23 +6,28 @@ use super::{device::*, packet::*};
 
 pub struct LinkSvc {
     pub device_list: Vec<Device>,
-    pub rx: Receiver<Packet>,
-    pub tx: Sender<Packet>
+    pub rx_auth: Receiver<Packet>,
+    pub tx_auth: Sender<Packet>,
+    pub rx_pod: Receiver<Vec<Device>>,
+    pub tx_pod: Sender<Vec<Device>>,
 }
 
+/// link_svc adds/removes/modifies devices to/from the pod
+/// 
 impl LinkSvc {
     /// Main service task for link service
     pub async fn run(mut self) -> Result<()> {
         println!("link_svc: service running");
         self.populate_temp_data();
 
-        while let Some(mut pkt) = self.rx.recv().await {
+        while let Some(mut pkt) = self.rx_auth.recv().await {
             // process response based on cmd_type variable
             let res = match pkt.cmd_type {
                 32 => self.get_device_list().unwrap(),
                 33 => self.add_device(pkt.payload[0].clone()).unwrap(),
                 34 => self.update_device(pkt.payload[0].clone()).unwrap(),
                 35 => self.remove_device(pkt.payload[0].clone()).unwrap(),
+                63 => self.lock_devices().await.unwrap(),
                 _ => s!["Command not implemented"]
             };
 
@@ -31,7 +36,7 @@ impl LinkSvc {
             pkt.payload.push(res);
 
             // send modified packet to auth_svc
-            if let Err(e) = self.tx.send(pkt).await {
+            if let Err(e) = self.tx_auth.send(pkt).await {
                 eprintln!("link->auth failed: {}", e);
             }
         }
@@ -42,6 +47,7 @@ impl LinkSvc {
     }
 
     /// Add new device to device list
+    /// 
     /// Return success message to client
     fn add_device(&mut self, req: String) -> Result<String, serde_json::Error> {
         println!("link_svc: add_device command received");
@@ -53,11 +59,27 @@ impl LinkSvc {
     }
 
     fn get_device_list(&self) -> Result<String, serde_json::Error> {
-        println!("get_device_list command received");
+        println!("link_svc: get_device_list command received");
         serde_json::to_string(&self.device_list)
     }
 
+    /// Lock device_list to start TCP connections to embedded devices
+    /// in pod_conn_svc
+    async fn lock_devices(&self) -> Result<String, serde_json::Error> {
+        println!("link_svc: lock_devices command received");
+
+        if let Err(e) = self.tx_pod.send(self.device_list.clone()).await {
+            println!("link->pod failed: {}", e);
+        }
+
+        // returning new device_list
+        
+
+        self.get_device_list()
+    }
+
     /// Find device received from client in device list and remove from vector
+    /// 
     /// Return success message to client
     fn remove_device(&mut self, req: String) -> Result<String, serde_json::Error> {
         println!("link_svc: remove_device command received");
@@ -70,6 +92,7 @@ impl LinkSvc {
     }
 
     /// Find device received from client in device list and update where id matches
+    /// 
     /// Return success message to the client
     fn update_device(&mut self, req: String) -> Result<String, serde_json::Error> {
         println!("link_svc: update_device command received");

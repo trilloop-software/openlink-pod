@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use std::net::Ipv4Addr;
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct Device {
     pub id: String,
     pub name: String,
@@ -13,26 +13,26 @@ pub struct Device {
     pub fields: Vec<DeviceField>
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 pub enum DeviceType {
     Battery,
     Inverter,
     Sensor
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 pub enum ConnectionStatus {
     Disconnected,
     Connected
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 pub enum DeviceStatus {
     Unsafe,
     Operational
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct DeviceField {
     pub field_name: String,
     pub field_value: String
