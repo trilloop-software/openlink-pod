@@ -27,17 +27,21 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let (tx_auth_to_link, rx_auth_to_link) = mpsc::channel::<Packet>(32);
     let (tx_link_to_auth, rx_link_to_auth) = mpsc::channel::<Packet>(32);
 
-    // pod_status-emerg
-    let (tx_pod_status_to_emerg, rx_pod_status_to_emerg) = mpsc::channel::<Packet>(32);
-    let (tx_emerg_to_pod_status, rx_emerg_to_pod_status) = mpsc::channel::<Packet>(32);
+    // ctrl-emerg
+    let (tx_ctrl_to_emerg, rx_ctrl_to_emerg) = mpsc::channel::<Packet>(32);
+    let (tx_emerg_to_ctrl, rx_emerg_to_ctrl) = mpsc::channel::<Packet>(32);
 
     // auth-emerg
     let (tx_auth_to_emerg, rx_auth_to_emerg) = mpsc::channel::<Packet>(32);
     let (tx_emerg_to_auth, rx_emerg_to_auth) = mpsc::channel::<Packet>(32);
 
-    // auth-pod_status
-    let (tx_auth_to_pod_status, rx_auth_to_pod_status) = mpsc::channel::<Packet>(32);
-    let (tx_pod_status_to_auth, rx_pod_status_to_auth) = mpsc::channel::<Packet>(32);
+    // auth-ctrl
+    let (tx_auth_to_ctrl, rx_auth_to_ctrl) = mpsc::channel::<Packet>(32);
+    let (tx_ctrl_to_auth, rx_ctrl_to_auth) = mpsc::channel::<Packet>(32);
+
+    // ctrl-pod
+    let (tx_ctrl_to_pod, rx_ctrl_to_pod) = mpsc::channel::<u8>(32);
+    let (tx_pod_to_ctrl, rx_pod_to_ctrl) = mpsc::channel::<u8>(32);
 
     // link-pod
     let (tx_link_to_pod, rx_link_to_pod) = mpsc::channel::<u8>(32);
@@ -56,8 +60,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         rx_link: rx_link_to_auth,
         tx_link: tx_auth_to_link,
 
-        rx_pod_status: rx_pod_status_to_auth,
-        tx_pod_status: tx_auth_to_pod_status,
+        rx_pod_status: rx_ctrl_to_auth,
+        tx_pod_status: tx_auth_to_ctrl,
 
         rx_emerg: rx_emerg_to_auth,
         tx_emerg: tx_auth_to_emerg,
@@ -67,18 +71,21 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         rx_auth: rx_auth_to_emerg,
         tx_auth: tx_emerg_to_auth,
 
-        rx_pod_status: rx_pod_status_to_emerg,
-        tx_pod_status: tx_emerg_to_pod_status
+        rx_pod_status: rx_ctrl_to_emerg,
+        tx_pod_status: tx_emerg_to_ctrl
     };
 
-    let pod_state_svc = ctrl_svc::CtrlSvc { 
+    let ctrl_svc = ctrl_svc::CtrlSvc { 
         pod_state: Arc::clone(&pod_state),
 
-        rx_auth: rx_auth_to_pod_status, 
-        tx_auth: tx_pod_status_to_auth,
+        rx_auth: rx_auth_to_ctrl, 
+        tx_auth: tx_ctrl_to_auth,
 
-        rx_emerg: rx_emerg_to_pod_status,
-        tx_emerg: tx_pod_status_to_emerg,
+        rx_emerg: rx_emerg_to_ctrl,
+        tx_emerg: tx_ctrl_to_emerg,
+
+        rx_pod: rx_pod_to_ctrl,
+        tx_pod: tx_ctrl_to_pod
     };
 
     let link_svc = link_svc::LinkSvc { 
@@ -98,12 +105,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         conn_list: Vec::new(),
         device_list: Arc::clone(&device_list),
         pod_state: pod_state,
-        rx_ctrl: todo!(),
-        tx_ctrl: todo!(),
-        rx_link: todo!(),
-        tx_link: todo!(),
-        rx_tele: todo!(),
-        tx_tele: todo!(),
+        rx_ctrl: rx_ctrl_to_pod,
+        tx_ctrl: tx_pod_to_ctrl,
+        rx_link: rx_link_to_pod,
+        tx_link: tx_pod_to_link,
+        //rx_tele: todo!(),
+        //tx_tele: todo!(),
     };
 
     // Spawn all services as tasks
@@ -111,7 +118,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     spawn(link_svc.run());
     spawn(remote_conn_svc.run());
     spawn(emerg_svc.run());
-    spawn(pod_state_svc.run());
+    spawn(ctrl_svc.run());
+    spawn(pod_conn_svc.run());
 
     loop {
 

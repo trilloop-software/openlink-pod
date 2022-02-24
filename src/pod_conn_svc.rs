@@ -1,8 +1,9 @@
 use anyhow::Result;
+use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tokio::{net::TcpStream, sync::{mpsc::Receiver, mpsc::Sender, Mutex}};
 
-// in pod_state_svc?
+#[derive(Serialize, Deserialize)]
 pub enum PodState {
     Unlocked,
     Locked,
@@ -11,17 +12,17 @@ pub enum PodState {
 }
 
 pub struct PodConnSvc {
-    conn_list: Vec<TcpStream>,
+    pub conn_list: Vec<TcpStream>,
     
     pub device_list: Arc<Mutex<Vec<super::device::Device>>>,
     pub pod_state: Arc<Mutex<PodState>>,
 
-    pub rx_ctrl: Receiver<i32>,
-    pub tx_ctrl: Sender<i32>,
+    pub rx_ctrl: Receiver<u8>,
+    pub tx_ctrl: Sender<u8>,
     pub rx_link: Receiver<u8>,
     pub tx_link: Sender<u8>,
-    pub rx_tele: Receiver<i32>,
-    pub tx_tele: Sender<i32>,
+    //pub rx_tele: Receiver<i32>,
+    //pub tx_tele: Sender<i32>,
 }
 
 /// pod_conn_svc opens and manages tcp streams to all embedded devices
@@ -33,8 +34,8 @@ impl PodConnSvc {
 
         loop {
             tokio::select! {
-                _ctrl_cmd = self.rx_ctrl.recv() => {
-                    self.send_cmd()
+                ctrl_cmd = self.rx_ctrl.recv() => {
+                    self.send_cmd(ctrl_cmd.unwrap())
                 },
                 link_cmd = self.rx_link.recv() => {
                     // link_svc lock received, start up all tcp connections
@@ -53,9 +54,9 @@ impl PodConnSvc {
                         _ => ()
                     }
                 },
-                _tele_cmd = self.rx_tele.recv() => {
+                /*tele_cmd = self.rx_tele.recv() => {
                     self.get_telemetry()
-                }
+                }*/
             }
         }
     }
@@ -89,7 +90,7 @@ impl PodConnSvc {
         Ok(())
     }
 
-    fn send_cmd(&mut self) {
+    fn send_cmd(&mut self, cmd: u8) {
         // send command to associated devices
         // (discovery packet should return array of available commands, figure out best way to store this and query it)
     }
