@@ -1,15 +1,16 @@
 use anyhow::{/*anyhow, */Result};
 use serde_json;
-use tokio::sync::{mpsc::Receiver, mpsc::Sender};
+use std::sync::Arc;
+use tokio::sync::{mpsc::Receiver, mpsc::Sender, Mutex};
 
 use super::{device::*, packet::*};
 
 pub struct LinkSvc {
-    pub device_list: Vec<Device>,
+    pub device_list: Arc<Mutex<Vec<Device>>>,
     pub rx_auth: Receiver<Packet>,
     pub tx_auth: Sender<Packet>,
-    pub rx_pod: Receiver<Vec<Device>>,
-    pub tx_pod: Sender<Vec<Device>>,
+    pub rx_pod: Receiver<u8>,
+    pub tx_pod: Sender<u8>,
 }
 
 /// link_svc adds/removes/modifies devices to/from the pod
@@ -23,11 +24,11 @@ impl LinkSvc {
         while let Some(mut pkt) = self.rx_auth.recv().await {
             // process response based on cmd_type variable
             let res = match pkt.cmd_type {
-                32 => self.get_device_list().unwrap(),
-                33 => self.add_device(pkt.payload[0].clone()).unwrap(),
-                34 => self.update_device(pkt.payload[0].clone()).unwrap(),
-                35 => self.remove_device(pkt.payload[0].clone()).unwrap(),
-                63 => self.lock_devices().await.unwrap(),
+                32 => self.get_device_list().await.unwrap(),
+                33 => self.add_device(pkt.payload[0].clone()).await.unwrap(),
+                34 => self.update_device(pkt.payload[0].clone()).await.unwrap(),
+                35 => self.remove_device(pkt.payload[0].clone()).await.unwrap(),
+                63 => self.lock_pod().await.unwrap(),
                 _ => s!["Command not implemented"]
             };
 
@@ -49,43 +50,43 @@ impl LinkSvc {
     /// Add new device to device list
     /// 
     /// Return success message to client
-    fn add_device(&mut self, req: String) -> Result<String, serde_json::Error> {
+    async fn add_device(&mut self, req: String) -> Result<String, serde_json::Error> {
         println!("link_svc: add_device command received");
         let dev: Device = serde_json::from_str(&req)?;
-        self.device_list.push(dev);
+        self.device_list.lock().await.push(dev);
         println!("link_svc: device added");
 
         Ok(s!["Device added"])
     }
 
-    fn get_device_list(&self) -> Result<String, serde_json::Error> {
+    async fn get_device_list(&self) -> Result<String, serde_json::Error> {
         println!("link_svc: get_device_list command received");
-        serde_json::to_string(&self.device_list)
+        serde_json::to_string(&self.device_list.lock().await.clone())
     }
 
     /// Lock device_list to start TCP connections to embedded devices
     /// in pod_conn_svc
-    async fn lock_devices(&self) -> Result<String, serde_json::Error> {
+    async fn lock_pod(&self) -> Result<String, serde_json::Error> {
         println!("link_svc: lock_devices command received");
 
-        if let Err(e) = self.tx_pod.send(self.device_list.clone()).await {
+        if let Err(e) = self.tx_pod.send(1).await {
             println!("link->pod failed: {}", e);
         }
 
         // returning new device_list
-        
 
-        self.get_device_list()
+
+        self.get_device_list().await
     }
 
     /// Find device received from client in device list and remove from vector
     /// 
     /// Return success message to client
-    fn remove_device(&mut self, req: String) -> Result<String, serde_json::Error> {
+    async fn remove_device(&mut self, req: String) -> Result<String, serde_json::Error> {
         println!("link_svc: remove_device command received");
         let dev: Device = serde_json::from_str(&req)?;
-        let index = self.device_list.iter().position(|d| d.id == dev.id).unwrap();
-        self.device_list.remove(index);
+        let index = self.device_list.lock().await.iter().position(|d| d.id == dev.id).unwrap();
+        self.device_list.lock().await.remove(index);
         println!("link_svc: device removed");
 
         Ok(s!["Device removed"])
@@ -94,19 +95,19 @@ impl LinkSvc {
     /// Find device received from client in device list and update where id matches
     /// 
     /// Return success message to the client
-    fn update_device(&mut self, req: String) -> Result<String, serde_json::Error> {
+    async fn update_device(&mut self, req: String) -> Result<String, serde_json::Error> {
         println!("link_svc: update_device command received");
         let dev: Device = serde_json::from_str(&req)?;
-        let index = self.device_list.iter().position(|d| d.id == dev.id).unwrap();
-        self.device_list[index] = dev;
+        let index = self.device_list.lock().await.iter().position(|d| d.id == dev.id).unwrap();
+        self.device_list.lock().await[index] = dev;
         println!("link_svc: device updated");
 
         Ok(s!["Device updated"])
     }
 
     /// Temporary function to populate the device list
-    fn populate_temp_data(&mut self) {
-        self.device_list.push(Device { 
+    async fn populate_temp_data(&mut self) {
+        self.device_list.lock().await.push(Device { 
             id: s!("yhvlwn1"),
             name: s!("Battery 1"),
             device_type: DeviceType::Battery,
@@ -120,7 +121,7 @@ impl LinkSvc {
             ] 
         });
 
-        self.device_list.push(Device { 
+        self.device_list.lock().await.push(Device { 
             id: s!("j5n4ook"),
             name: s!("Inverter 1"),
             device_type: DeviceType::Inverter,
@@ -134,7 +135,7 @@ impl LinkSvc {
             ] 
         });
 
-        self.device_list.push(Device { 
+        self.device_list.lock().await.push(Device { 
             id: s!("573vxfk"),
             name: s!("Sensor 1"),
             device_type: DeviceType::Sensor,
