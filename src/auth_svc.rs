@@ -10,14 +10,11 @@ pub struct AuthSvc {
     pub rx_link: Receiver<Packet>,
     pub tx_link: Sender<Packet>,
 
-    pub rx_brake: Receiver<Packet>,
-    pub tx_brake: Sender<Packet>,
-
     pub rx_emerg: Receiver<Packet>,
     pub tx_emerg: Sender<Packet>,
     
-    pub rx_launch: Receiver<Packet>,
-    pub tx_launch: Sender<Packet>
+    pub rx_pod_status: Receiver<Packet>,
+    pub tx_pod_status: Sender<Packet>
 }
 
 impl AuthSvc {
@@ -28,6 +25,7 @@ impl AuthSvc {
 
         while let Some(pkt) = self.rx_remote.recv().await {
             // send packet to associated service based on cmd_type field range
+            println!("Packet of type {} received", pkt.cmd_type);
             let resp: Packet = match pkt.cmd_type {
                 0..=31 => {
                     // auth service command handling
@@ -40,21 +38,14 @@ impl AuthSvc {
                     }
                     self.rx_link.recv().await.unwrap()
                 },
-                64..=95 => {
-                    // launch service command handling
-                    if let Err(e) = self.tx_launch.send(pkt).await {
+                64..=127 => {
+                    // pod state service command handling
+                    if let Err(e) = self.tx_pod_status.send(pkt).await {
                         eprintln!("auth->launch failed: {}", e);
                     }
-                    self.rx_launch.recv().await.unwrap()
+                    self.rx_pod_status.recv().await.unwrap()
 
                     //pkt
-                },
-                96..=127 => {
-                    // brake service command handling
-                    if let Err(e) = self.tx_brake.send(pkt).await {
-                        eprintln!("auth->brake failed: {}", e);
-                    }
-                    self.rx_brake.recv().await.unwrap()
                 },
                 128..=159 => {
                     // telemetry service command handling

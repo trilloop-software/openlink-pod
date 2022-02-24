@@ -10,8 +10,8 @@ pub struct EmergSvc{ //connections to auth, brake, telemetry
     pub rx_auth : Receiver<Packet>,
     pub tx_auth : Sender<Packet>,
 
-    pub rx_brake : Receiver<Packet>,
-    pub tx_brake : Sender<Packet>
+    pub rx_pod_status : Receiver<Packet>,
+    pub tx_pod_status : Sender<Packet>
 
     //pub rx_tele : Receiver<Packet>,
     //pub tx_tele : Sender<Packet>
@@ -31,16 +31,16 @@ impl EmergSvc
                     let pkt = Packet { //packet to send to brake_svc
                         packet_id: s!["OPENLINK"],
                         version: 1,
-                        cmd_type: 96, //placeholder, haven't really set what command means what yet
+                        cmd_type: 99, 
                         timestamp: std::time::SystemTime::now(),
-                        payload: vec!["Stop".to_string()]
+                        payload: vec![1.to_string()]
                     };
 
-                    match self.tx_brake.send(pkt).await{ //send to brake and get response, then send response back to auth
+                    match self.tx_pod_status.send(pkt).await{ //send to brake and get response, then send response back to auth
                         Ok(()) => { //send it back to auth
-                            let res = self.rx_brake.recv().await.unwrap();
+                            let res = self.rx_pod_status.recv().await.unwrap();
                             if let Err(e) = self.tx_auth.send(res).await {
-                                eprintln!("Brake->Auth failed: {}", e);
+                                eprintln!("Emerg->Auth failed: {}", e);
                             }
                         },
                         Err(e) => println!("Emerg->Brake failed, Error: {}", e)
