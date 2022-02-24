@@ -19,7 +19,7 @@ impl LinkSvc {
     /// Main service task for link service
     pub async fn run(mut self) -> Result<()> {
         println!("link_svc: service running");
-        self.populate_temp_data().await;
+        //self.populate_temp_data().await;
 
         while let Some(mut pkt) = self.rx_auth.recv().await {
             // process response based on cmd_type variable
@@ -69,13 +69,12 @@ impl LinkSvc {
     async fn lock_pod(&self) -> Result<String, serde_json::Error> {
         println!("link_svc: lock_devices command received");
 
+        //send lock command to pod_conn_svc
         if let Err(e) = self.tx_pod.send(1).await {
             println!("link->pod failed: {}", e);
         }
 
         // returning new device_list
-
-
         self.get_device_list().await
     }
 

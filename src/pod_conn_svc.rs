@@ -37,17 +37,25 @@ impl PodConnSvc {
                 ctrl_cmd = self.rx_ctrl.recv() => {
                     self.send_cmd(ctrl_cmd.unwrap())
                 },
+
+                //handle commands from link_svc
                 link_cmd = self.rx_link.recv() => {
-                    // link_svc lock received, start up all tcp connections
-                    // if successful, set pod state to locked state and trigger discovery packet
-                    // 
-                    // if unsuccessful report unchanged state to user?
+
                     match link_cmd.unwrap() {
+                        // lock cmd  
+                        // start up all tcp connections
+                        // if successful, set pod state to locked state and trigger discovery packet
+                        // 
+                        // if unsuccessful report unchanged state to user?
                         1 => {
                             let res = match self.populate_conn_list().await {
                                 Ok(()) => 1,
                                 Err(()) => 0,
                             };
+
+                            if(res==1){
+                                self.send_cmd(1)
+                            }
 
                             self.tx_link.send(res).await;
                         },
@@ -77,7 +85,7 @@ impl PodConnSvc {
             let addr = format!("{}:{}", dev.ip_address, dev.port);
             match TcpStream::connect(addr).await {
                 Ok(s) => self.conn_list.push(s),
-                Err(_) => {}
+                Err(_) => {println!("couldn't connect ")}
             }
         }
 
@@ -91,8 +99,12 @@ impl PodConnSvc {
     }
 
     fn send_cmd(&mut self, cmd: u8) {
+
         // send command to associated devices
-        // (discovery packet should return array of available commands, figure out best way to store this and query it)
+        // discovery packet should be cmd #1
+        //  -returns array of available commands and array of device fields
+        //  -figure out best way to store this and query it
+        println!("sending cmd to device");
     }
 }
 
