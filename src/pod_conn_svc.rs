@@ -1,7 +1,14 @@
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
-use tokio::{net::TcpStream, sync::{mpsc::Receiver, mpsc::Sender, Mutex}};
+use tokio::{net::TcpStream, sync::{mpsc::Receiver, mpsc::Sender, Mutex}, io::AsyncWriteExt, io::AsyncReadExt};
+use futures_util::stream::StreamExt;
+use quinn::{Endpoint, ServerConfig};
+use std::{error::Error};
+use tracing::{error, info};
+
+//tried defining a new file pod_packet.rs, but the compiler could not find it for some reason
+use super::packet::*;
 
 #[derive(Serialize, Deserialize)]
 pub enum PodState {
@@ -34,9 +41,9 @@ impl PodConnSvc {
 
         loop {
             tokio::select! {
-                ctrl_cmd = self.rx_ctrl.recv() => {
-                    self.send_cmd(ctrl_cmd.unwrap())
-                },
+                //ctrl_cmd = self.rx_ctrl.recv() => {
+                //    self.send_cmd(0,ctrl_cmd.unwrap())
+                //},
 
                 //handle commands from link_svc
                 link_cmd = self.rx_link.recv() => {
@@ -48,16 +55,21 @@ impl PodConnSvc {
                         // 
                         // if unsuccessful report unchanged state to user?
                         1 => {
-                            let res = match self.populate_conn_list().await {
-                                Ok(()) => 1,
-                                Err(()) => 0,
+
+                            
+                            match self.populate_conn_list().await {
+                                Ok(()) => {
+                                    let res = match self.send_cmd(0,1).await{
+                                        Ok(()) => 1,
+                                        Err(()) => 0,
+                                    };
+                                    self.tx_link.send(res).await;
+                                },
+                                Err(()) => {
+
+                                },
                             };
-
-                            if(res==1){
-                                self.send_cmd(1)
-                            }
-
-                            self.tx_link.send(res).await;
+                            
                         },
                         _ => ()
                     }
@@ -98,13 +110,46 @@ impl PodConnSvc {
         Ok(())
     }
 
-    fn send_cmd(&mut self, cmd: u8) {
+    async fn send_cmd(&mut self, index:usize, cmd: u8)-> Result<(), ()> {
 
         // send command to associated devices
         // discovery packet should be cmd #1
         //  -returns array of available commands and array of device fields
         //  -figure out best way to store this and query it
         println!("sending cmd to device");
+
+        //contruct the packet
+        //let packet = encode(Packet::new(0, vec![s!("Test")]));
+
+        //for b in packet{
+        //    println!("{}",b);
+        //}
+
+        let packet = encode(Packet::new(0, vec![s!("Test")]));
+        //send it to the device
+        let res = match self.conn_list[index].write_all(&packet).await{
+            Ok(res) => println!("success"),
+            Err(e) => println!("failed to send command: {}", s!(e))
+        };
+
+        //read the packet that is returned by the device
+        let mut buf = vec![0; 1024];
+        let res = match self.conn_list[index].read(&mut buf).await{
+            Ok(size) => {
+
+                println!("received response to command");
+
+                //try to decode the response to the command
+                let pckt = decode(buf[0..size].to_vec());
+
+                println!("decoded response to command");
+                
+            },
+            Err(e) => println!("failed to send command: {}", s!(e))
+        };
+
+        Ok(())
+
     }
 }
 

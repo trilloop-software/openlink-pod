@@ -30,3 +30,4 @@ pub fn decode(pkt: Vec<u8>) -> Packet {
 pub fn encode(pkt: Packet) -> Vec<u8> {
     serialize(&pkt).unwrap()
 }
+
