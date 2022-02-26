@@ -1,13 +1,9 @@
 use super::pod_packet::*;
 
-use anyhow::{anyhow, Result};
+use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tokio::{net::TcpStream, sync::{mpsc::Receiver, mpsc::Sender, Mutex}, io::AsyncWriteExt, io::AsyncReadExt};
-use futures_util::stream::StreamExt;
-use quinn::{Endpoint, ServerConfig};
-use std::{error::Error};
-use tracing::{error, info};
 
 #[derive(Serialize, Deserialize)]
 pub enum PodState {
@@ -25,6 +21,8 @@ pub struct PodConnSvc {
 
     pub rx_ctrl: Receiver<u8>,
     pub tx_ctrl: Sender<u8>,
+    pub rx_emerg: Receiver<u8>,
+    pub tx_emerg: Sender<u8>,
     pub rx_link: Receiver<u8>,
     pub tx_link: Sender<u8>,
     //pub rx_tele: Receiver<i32>,
@@ -44,6 +42,27 @@ impl PodConnSvc {
                 //    self.send_cmd(0,ctrl_cmd.unwrap())
                 //},
 
+                _ = self.rx_emerg.recv() => {
+                    // check pod_state
+                    match *self.pod_state.lock().await {
+                        PodState::Moving => {
+                            // initiate braking
+                            // send_cmd(emergengcy brake);
+                            // braking command successful, return success to emerg_svc
+                            if let Err(e) = self.tx_emerg.send(1).await {
+                                eprintln!("pod->emerg failed: {}", e);
+                            };
+                        },
+                        _ => {
+                            // braking command unnecessary, return fail message to emerg_svc
+                            if let Err(e) = self.tx_emerg.send(0).await {
+                                eprintln!("pod->emerg failed: {}", e);
+                            };
+                        }
+                    }
+
+                }
+
                 //handle commands from link_svc
                 link_cmd = self.rx_link.recv() => {
 
@@ -62,7 +81,9 @@ impl PodConnSvc {
                                         Ok(()) => 1,
                                         Err(()) => 0,
                                     };
-                                    self.tx_link.send(res).await;
+                                    if let Err(e) = self.tx_link.send(res).await {
+                                        eprintln!("pod->link failed: {}", e);
+                                    };
                                 },
                                 Err(()) => {
 

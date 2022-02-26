@@ -9,12 +9,9 @@ pub struct AuthSvc {
 
     pub rx_link: Receiver<Packet>,
     pub tx_link: Sender<Packet>,
-
-    pub rx_emerg: Receiver<Packet>,
-    pub tx_emerg: Sender<Packet>,
     
-    pub rx_pod_status: Receiver<Packet>,
-    pub tx_pod_status: Sender<Packet>
+    pub rx_ctrl: Receiver<Packet>,
+    pub tx_ctrl: Sender<Packet>
 }
 
 impl AuthSvc {
@@ -40,12 +37,10 @@ impl AuthSvc {
                 },
                 64..=127 => {
                     // pod state service command handling
-                    if let Err(e) = self.tx_pod_status.send(pkt).await {
+                    if let Err(e) = self.tx_ctrl.send(pkt).await {
                         eprintln!("auth->launch failed: {}", e);
                     }
-                    self.rx_pod_status.recv().await.unwrap()
-
-                    //pkt
+                    self.rx_ctrl.recv().await.unwrap()
                 },
                 128..=159 => {
                     // telemetry service command handling
@@ -60,16 +55,10 @@ impl AuthSvc {
                     // 
                     pkt
                 },
-                228..=254 => {
+                228..=255 => {
                     // extra?
                     pkt
                 },
-                255..=255 => { //emergency command
-                    if let Err(e) = self.tx_emerg.send(pkt).await {
-                        eprintln!("auth->emerg failed: {}", e);
-                    }
-                    self.rx_emerg.recv().await.unwrap()
-                }
             };
 
             // send the modified packet back to remote_conn_svc

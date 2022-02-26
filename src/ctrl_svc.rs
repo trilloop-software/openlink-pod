@@ -23,9 +23,6 @@ pub struct CtrlSvc {
     pub rx_auth : Receiver<Packet>,
     pub tx_auth : Sender<Packet>,
 
-    pub rx_emerg : Receiver<Packet>,
-    pub tx_emerg: Sender<Packet>,
-
     pub rx_pod : Receiver<u8>,
     pub tx_pod: Sender<u8>
 }
@@ -54,27 +51,6 @@ impl CtrlSvc {
 
                     if let Err(e) = self.tx_auth.send(response).await{
                         eprintln!("PodState->Auth failed: {}", e);
-                    }
-                }
-
-                pkt = self.rx_emerg.recv() => {
-                    println!("emerg -> pod_state received");
-
-                    let mut response = Packet { //default packet
-                        packet_id: s!["OPENLINK"],
-                        version: 1,
-                        cmd_type: 0,
-                        timestamp: std::time::SystemTime::now(),
-                        payload: vec!["Error".to_string()]
-                    };
-
-                    match pkt {
-                        Some(packet) => response = self.command_handler(packet).await.unwrap(),
-                        None => println!("No packet here?!"),
-                    }
-
-                    if let Err(e) = self.tx_emerg.send(response).await{
-                        eprintln!("PodState->Emerg failed: {}", e);
                     }
                 }
             }
