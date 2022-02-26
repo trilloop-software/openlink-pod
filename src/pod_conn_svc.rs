@@ -1,3 +1,5 @@
+use super::pod_packet::*;
+
 use anyhow::{anyhow, Result};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
@@ -6,9 +8,6 @@ use futures_util::stream::StreamExt;
 use quinn::{Endpoint, ServerConfig};
 use std::{error::Error};
 use tracing::{error, info};
-
-//tried defining a new file pod_packet.rs, but the compiler could not find it for some reason
-use super::packet::*;
 
 #[derive(Serialize, Deserialize)]
 pub enum PodState {
@@ -125,7 +124,7 @@ impl PodConnSvc {
         //    println!("{}",b);
         //}
 
-        let packet = encode(Packet::new(0, vec![s!("Test")]));
+        let packet = encode(PodPacket::new(0, vec![s!("Test")]));
         //send it to the device
         let res = match self.conn_list[index].write_all(&packet).await{
             Ok(res) => println!("success"),

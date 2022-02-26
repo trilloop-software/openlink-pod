@@ -9,6 +9,7 @@ mod auth_svc;
 mod device;
 mod link_svc;
 mod packet;
+mod pod_packet;
 mod remote_conn_svc;
 mod emerg_svc;
 mod pod_conn_svc;
