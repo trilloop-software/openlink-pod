@@ -1,4 +1,5 @@
 use super::pod_packet::*;
+use super::pod_packet_payload::*;
 
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
@@ -38,6 +39,7 @@ impl PodConnSvc {
 
         loop {
             tokio::select! {
+                //handle commands from ctrl_svc
                 //ctrl_cmd = self.rx_ctrl.recv() => {
                 //    self.send_cmd(0,ctrl_cmd.unwrap())
                 //},
@@ -66,6 +68,7 @@ impl PodConnSvc {
                 //handle commands from link_svc
                 link_cmd = self.rx_link.recv() => {
 
+                    //parse the command, and act based on it's command type
                     match link_cmd.unwrap() {
                         // lock cmd  
                         // start up all tcp connections
@@ -74,9 +77,12 @@ impl PodConnSvc {
                         // if unsuccessful report unchanged state to user?
                         1 => {
 
-                            
                             match self.populate_conn_list().await {
                                 Ok(()) => {
+
+                                    //send the discovery packet command
+                                    //to each device
+                                    //for testing purposes, only send it to the first device
                                     let res = match self.send_cmd(0,1).await{
                                         Ok(()) => 1,
                                         Err(()) => 0,
@@ -133,36 +139,71 @@ impl PodConnSvc {
     async fn send_cmd(&mut self, index:usize, cmd: u8)-> Result<(), ()> {
 
         // send command to associated devices
-        // discovery packet should be cmd #1
         //  -returns array of available commands and array of device fields
         //  -figure out best way to store this and query it
         println!("sending cmd to device");
 
         //contruct the packet
-        //let packet = encode(Packet::new(0, vec![s!("Test")]));
+        //build payload contents based on command type
 
-        //for b in packet{
+        //let mut payload = PodPacketPayload::new();
+        //for b in encode_payload(payload){
         //    println!("{}",b);
         //}
 
-        let packet = encode(PodPacket::new(0, vec![s!("Test")]));
-        //send it to the device
-        let res = match self.conn_list[index].write_all(&packet).await{
-            Ok(res) => println!("success"),
+        let mut payload = PodPacketPayload::new();
+        let packet = encode(PodPacket::new(cmd, encode_payload(payload)));
+
+        //send packet to the device
+        match self.conn_list[index].write_all(&packet).await{
+            Ok(res) => println!("successfully sent command"),
             Err(e) => println!("failed to send command: {}", s!(e))
         };
 
         //read the packet that is returned by the device
         let mut buf = vec![0; 1024];
-        let res = match self.conn_list[index].read(&mut buf).await{
+        match self.conn_list[index].read(&mut buf).await{
             Ok(size) => {
 
                 println!("received response to command");
 
-                //try to decode the response to the command
-                let pckt = decode(buf[0..size].to_vec());
-
+                //decode the response to the command
+                let resp = decode(buf[0..size].to_vec());
+                let payload = decode_payload(resp.payload);
                 println!("decoded response to command");
+
+                //process the response, based on the type of command that it is responding to
+                //TODO: check that the cmd_type of the response matches up
+                match cmd {
+                    //response to an emergency command
+                    255 =>{
+
+                    },
+                    //error response 
+                    0 =>{
+
+                    }
+                    //response to a discovery command
+                    1 =>{
+
+                        //TODO store these in the Device struct
+                        println!("Discovered Telemetry Fields:");
+                        println!("{}",payload.field_names[0]);
+                        println!("{}",payload.field_names[1]);
+                        println!("{}",payload.field_names[2]);
+                        println!("Discovered Commands:");
+                        println!("{}",payload.commands[0]);
+                        println!("{}",payload.commands[1]);
+                        println!("{}",payload.commands[2]);
+                    },
+                    // commands 2-255 are not reserved for any particular command 
+                    // (unlike 0 for emergency or 1 for discovery)
+                    // so they need to be matched to the commands for device that sent the response packet
+                    2..=255 =>{
+                        //retrieve the list of commands for the device that sent the packet
+                        //match the packet's cmd_type to the appropriate device-specific command
+                    }
+                }
                 
             },
             Err(e) => println!("failed to send command: {}", s!(e))

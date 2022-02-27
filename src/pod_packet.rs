@@ -7,11 +7,14 @@ pub struct PodPacket {
     pub version: u8,
     pub cmd_type: u8,
     // no timestamp because embedded devices may not have system time
-    pub payload: Vec<String>
+
+    //the payload takes the form of another struct: PodPacketPayload
+    //however, it is encoded as a Vec<u8>, and decoded seperately once the PodPacket is decoded
+    pub payload: Vec<u8> 
 }
 
 impl PodPacket {
-    pub fn new(cmd_type: u8, payload: Vec<String>) -> Self {
+    pub fn new(cmd_type: u8, payload: Vec<u8>) -> Self {
         Self {
             packet_id: "OPENLINK".to_string(),
             version: 1,
