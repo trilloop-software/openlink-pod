@@ -1,5 +1,6 @@
 use super::pod_packet::*;
 use super::pod_packet_payload::*;
+use super::device::*;
 
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
@@ -38,6 +39,7 @@ impl PodConnSvc {
         println!("pod_conn_svc: service running");
 
         loop {
+
             tokio::select! {
                 //handle commands from ctrl_svc
                 //ctrl_cmd = self.rx_ctrl.recv() => {
@@ -67,7 +69,6 @@ impl PodConnSvc {
 
                 //handle commands from link_svc
                 link_cmd = self.rx_link.recv() => {
-
                     //parse the command, and act based on it's command type
                     match link_cmd.unwrap() {
                         // lock cmd  
@@ -77,24 +78,41 @@ impl PodConnSvc {
                         // if unsuccessful report unchanged state to user?
                         1 => {
 
-                            match self.populate_conn_list().await {
-                                Ok(()) => {
+                            let mut unlocked =false;
 
-                                    //send the discovery packet command
-                                    //to each device
-                                    //for testing purposes, only send it to the first device
-                                    let res = match self.send_cmd(0,1).await{
-                                        Ok(()) => 1,
-                                        Err(()) => 0,
-                                    };
-                                    if let Err(e) = self.tx_link.send(res).await {
-                                        eprintln!("pod->link failed: {}", e);
-                                    };
+                            //check if the pod is already locked before following through with the lock command
+                            match *self.pod_state.lock().await {
+                                PodState::Unlocked => {
+                                    unlocked =true;
                                 },
-                                Err(()) => {
+                                _ => {
+                                    // braking command unnecessary, return fail message
+                                        eprintln!("Pod already locked");
 
-                                },
-                            };
+                                }
+                            }
+
+                            if(unlocked){
+                                match self.populate_conn_list().await {
+                                    Ok(()) => {
+    
+                                        //send the discovery packet command
+                                        //to each device
+                                        //for testing purposes, only send it to the first device
+                                        let res = match self.send_cmd(0,1).await{
+                                            Ok(()) => 1,
+                                            Err(()) => 0,
+                                        };
+                                        if let Err(e) = self.tx_link.send(res).await {
+                                            eprintln!("pod->link failed: {}", e);
+                                        };
+                                    },
+                                    Err(()) => {
+    
+                                    },
+                                };
+                            }
+
                             
                         },
                         _ => ()
@@ -186,15 +204,42 @@ impl PodConnSvc {
                     //response to a discovery command
                     1 =>{
 
-                        //TODO store these in the Device struct
+                        //extract the list of new field names
+                        let mut field_list = Vec::<DeviceField>::new();
+                        for field in payload.field_names{
+                            field_list.push(DeviceField::new(field));
+                        }
+
+                        let mut cmd_list = Vec::<DeviceCommand>::new();
+                        for value in payload.command_values{
+                            cmd_list.push(DeviceCommand::new(s!["[PLACEHOLDER NAME]"],value));
+                        }
+
+                        // clone the target device from the shared device list
+                        let mut new_device = self.device_list.lock().await[index].clone();
+
+                        // make changes to a clone of it
+                        new_device.fields = field_list;
+                        new_device.commands = cmd_list;
+
+                        //DEBUGGING PURPOSES
+                        //print the new fields/commands
                         println!("Discovered Telemetry Fields:");
-                        println!("{}",payload.field_names[0]);
-                        println!("{}",payload.field_names[1]);
-                        println!("{}",payload.field_names[2]);
+                        println!("{}",new_device.fields[0]);
+                        println!("{}",new_device.fields[1]);
+                        println!("{}",new_device.fields[2]);
+
                         println!("Discovered Commands:");
-                        println!("{}",payload.commands[0]);
-                        println!("{}",payload.commands[1]);
-                        println!("{}",payload.commands[2]);
+                        println!("{}",new_device.commands[0]);
+                        println!("{}",new_device.commands[1]);
+                        println!("{}",new_device.commands[2]);
+
+                        //push those changes to the shared device list
+                        self.device_list.lock().await[index] = new_device;
+                        
+                        //success message
+                        println!("Discovered Fields and Commands saved");
+
                     },
                     // commands 2-255 are not reserved for any particular command 
                     // (unlike 0 for emergency or 1 for discovery)

@@ -30,7 +30,10 @@ impl EmergSvc {
                                 _ => println!("???")
                             }
                         },
-                        Err(e) => eprintln!("emerg->pod failed: {}", e)
+                        Err(e) => {
+                            //TODO: UNCOMMENT
+                            //eprintln!("emerg->pod failed: {}", e)
+                        }
                     }
                 }
                 /*_ = self.rx_tele.recv() => {

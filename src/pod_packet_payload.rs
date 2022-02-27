@@ -7,18 +7,18 @@ use bincode::{serialize, deserialize};
 pub struct PodPacketPayload {
 
     pub field_names: Vec<String>,
-    pub telemetry_data: Vec<u8>, //assume all data is of type u8 for now (maybe make this Vec<Vec<u8>> later?)
+    pub field_values: Vec<String>, //field data is parsed to a string for now. Since there are too many possible data types (u8,i32,etc)
     pub command_names: Vec<String>,
-    pub commands: Vec<u8>,
+    pub command_values: Vec<u8>,
 }
 
 impl PodPacketPayload {
     pub fn new() -> Self {
         Self {
             field_names: Vec::new(),
-            telemetry_data: Vec::new(), //assume all data is of type u8 for now (maybe make this Vec<byte array> later?)
+            field_values: Vec::new(), 
             command_names: Vec::new(),
-            commands: Vec::new(),
+            command_values: Vec::new(),
         }
     }
     

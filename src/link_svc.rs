@@ -39,6 +39,7 @@ impl LinkSvc {
             // send modified packet to auth_svc
             if let Err(e) = self.tx_auth.send(pkt).await {
                 eprintln!("link->auth failed: {}", e);
+                break;
             }
         }
 
@@ -117,7 +118,8 @@ impl LinkSvc {
             fields: vec![ 
                 DeviceField { field_name: s!("Temperature"), field_value: s!("") },
                 DeviceField { field_name: s!("Power"), field_value: s!("") }
-            ] 
+            ] ,
+            commands: vec![] 
         });
 
         self.device_list.lock().await.push(Device { 
@@ -131,7 +133,8 @@ impl LinkSvc {
             fields: vec![ 
                 DeviceField { field_name: s!("Inverter Field 1"), field_value: s!("") },
                 DeviceField { field_name: s!("Inverter Field 2"), field_value: s!("") }
-            ] 
+            ] ,
+            commands: vec![] 
         });
 
         self.device_list.lock().await.push(Device { 
@@ -142,7 +145,8 @@ impl LinkSvc {
             port: 0,
             connection_status: ConnectionStatus::Disconnected,
             device_status: DeviceStatus::Unsafe,
-            fields: vec![] 
+            fields: vec![] ,
+            commands: vec![]  
         });
     }
 }

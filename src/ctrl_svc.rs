@@ -34,7 +34,8 @@ impl CtrlSvc {
         loop {
             tokio::select!{
                 pkt = self.rx_auth.recv() => {
-                    println!("auth -> pod_state received");
+                    //TODO: UNCOMMENT
+                    //println!("auth -> pod_state received");
 
                     let mut response = Packet { //default packet
                         packet_id: s!["OPENLINK"],
@@ -46,11 +47,15 @@ impl CtrlSvc {
 
                     match pkt {
                         Some(packet) => response = self.command_handler(packet).await.unwrap(),
-                        None => println!("No packet here?!"),
+                        None => {
+                            //TODO: UNCOMMENT
+                            //println!("No packet here?!")
+                        },
                     }
 
                     if let Err(e) = self.tx_auth.send(response).await{
-                        eprintln!("PodState->Auth failed: {}", e);
+                        //TODO: UNCOMMENT
+                        //eprintln!("PodState->Auth failed: {}", e);
                     }
                 }
             }
