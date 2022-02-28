@@ -71,6 +71,7 @@ impl PodConnSvc {
                 link_cmd = self.rx_link.recv() => {
                     //parse the command, and act based on it's command type
                     match link_cmd.unwrap() {
+
                         // lock cmd  
                         // start up all tcp connections
                         // if successful, set pod state to locked state and trigger discovery packet
@@ -86,13 +87,16 @@ impl PodConnSvc {
                                     unlocked =true;
                                 },
                                 _ => {
-                                    // braking command unnecessary, return fail message
+                                    // locking command unnecessary, return fail message
                                         eprintln!("Pod already locked");
+                                    //TODO: return an error message to link_svc
 
                                 }
                             }
 
                             if(unlocked){
+
+                                //open TCP connections to all devices
                                 match self.populate_conn_list().await {
                                     Ok(()) => {
     
@@ -115,6 +119,51 @@ impl PodConnSvc {
 
                             
                         },
+                        // unlock cmd
+                        // end all tcp connections
+                        // if successful, set pod state to unlocked state
+                        2 =>{
+                            let mut unlocked =true;
+
+                            //check if the pod is already locked before following through with the lock command
+                            match *self.pod_state.lock().await {
+                                PodState::Locked => {
+                                    unlocked = false;
+                                },
+                                PodState::Unlocked => {
+                                    // locking command unnecessary, return fail message
+                                    eprintln!("Pod already unlocked");
+                                    //TODO: return an error message to link_svc
+
+                                }
+                                _ => {
+                                    // unlocking command denied when pod is Moving or Braking
+                                    //return fail message
+                                    eprintln!("Pod may only be Unlocked when in Locked state");
+                                    //TODO: return an error message to link_svc
+
+                                }
+                            }
+                        
+                            //if pod is in Locked state
+                            //follow through with setting it to Unlocked state
+                            if(!unlocked){
+                                *self.pod_state.lock().await = PodState::Unlocked;
+
+                                //close TCP connections to all devices
+                                match self.clear_conn_list().await{
+                                    Ok(()) =>{
+                                        println!("device connections closed successfully");
+                                    }
+                                    Err(())=>{
+                                        println!("error: could not close device connections");
+                                    }
+                                };
+                                
+
+                            }
+
+                        }
                         _ => ()
                     }
                 },
@@ -154,6 +203,17 @@ impl PodConnSvc {
         Ok(())
     }
 
+    async fn clear_conn_list(&mut self) -> Result<(), ()> {
+
+        let size = self.device_list.lock().await.len();
+
+        for index in 0..size{
+            self.send_cmd(index,2).await;
+        }
+
+        Ok(())
+    }
+
     async fn send_cmd(&mut self, index:usize, cmd: u8)-> Result<(), ()> {
 
         // send command to associated devices
@@ -164,11 +224,6 @@ impl PodConnSvc {
         //contruct the packet
         //build payload contents based on command type
 
-        //let mut payload = PodPacketPayload::new();
-        //for b in encode_payload(payload){
-        //    println!("{}",b);
-        //}
-
         let mut payload = PodPacketPayload::new();
         let packet = encode(PodPacket::new(cmd, encode_payload(payload)));
 
@@ -178,81 +233,95 @@ impl PodConnSvc {
             Err(e) => println!("failed to send command: {}", s!(e))
         };
 
-        //read the packet that is returned by the device
-        let mut buf = vec![0; 1024];
-        match self.conn_list[index].read(&mut buf).await{
-            Ok(size) => {
+        //determine if response packet is expected
+        if(cmd ==2){
 
-                println!("received response to command");
+        }
+        else{
+            //read the packet that is returned by the device
+            let mut buf = vec![0; 1024];
+            match self.conn_list[index].read(&mut buf).await{
+                Ok(size) => {
 
-                //decode the response to the command
-                let resp = decode(buf[0..size].to_vec());
-                let payload = decode_payload(resp.payload);
-                println!("decoded response to command");
+                    println!("received response to command");
 
-                //process the response, based on the type of command that it is responding to
-                //TODO: check that the cmd_type of the response matches up
-                match cmd {
-                    //response to an emergency command
-                    255 =>{
+                    //decode the response to the command
+                    let resp = decode(buf[0..size].to_vec());
+                    let payload = decode_payload(resp.payload);
+                    println!("decoded response to command");
 
-                    },
-                    //error response 
-                    0 =>{
+                    //process the response, based on the type of command that it is responding to
+                    //TODO: check that the cmd_type of the response matches up
+                    match cmd {
+                        //response to an emergency command
+                        255 =>{
 
-                    }
-                    //response to a discovery command
-                    1 =>{
+                        },
+                        //error response 
+                        0 =>{
 
-                        //extract the list of new field names
-                        let mut field_list = Vec::<DeviceField>::new();
-                        for field in payload.field_names{
-                            field_list.push(DeviceField::new(field));
                         }
+                        //response to a discovery command
+                        1 =>{
 
-                        let mut cmd_list = Vec::<DeviceCommand>::new();
-                        for value in payload.command_values{
-                            cmd_list.push(DeviceCommand::new(s!["[PLACEHOLDER NAME]"],value));
+                            //extract the list of new field names
+                            let mut field_list = Vec::<DeviceField>::new();
+                            for field in payload.field_names{
+                                field_list.push(DeviceField::new(field));
+                            }
+
+                            //extract the list of new command anmes and their corresponding codes
+                            let mut cmd_list = Vec::<DeviceCommand>::new();
+                            for index in 0..payload.command_values.len(){
+                                cmd_list.push(DeviceCommand::new(payload.command_names[index].clone(),payload.command_values[index]));
+                            }
+
+                            // clone the target device from the shared device list
+                            let mut new_device = self.device_list.lock().await[index].clone();
+
+                            // make changes to an updated clone of the original Device instance
+                            new_device.fields = field_list;
+                            new_device.commands = cmd_list;
+
+                            // DEBUGGING PURPOSES
+                            // print the new fields/commands
+                            println!("Discovered Telemetry Fields:");
+                            println!("{}",new_device.fields[0]);
+                            println!("{}",new_device.fields[1]);
+                            println!("{}",new_device.fields[2]);
+
+                            println!("Discovered Commands:");
+                            println!("{}",new_device.commands[0]);
+                            println!("{}",new_device.commands[1]);
+                            println!("{}",new_device.commands[2]);
+
+                            // overwrite the original device in the list
+                            // with the updated clone
+                            self.device_list.lock().await[index] = new_device;
+                            
+                            // success message
+                            println!("Discovered Fields and Commands saved");
+
+                        },
+                        //command #2 is reserved for disconnect commands
+                        //should not receive a response
+                        2 =>{
+                            println!("Error: received response to disconnect command");
                         }
-
-                        // clone the target device from the shared device list
-                        let mut new_device = self.device_list.lock().await[index].clone();
-
-                        // make changes to a clone of it
-                        new_device.fields = field_list;
-                        new_device.commands = cmd_list;
-
-                        //DEBUGGING PURPOSES
-                        //print the new fields/commands
-                        println!("Discovered Telemetry Fields:");
-                        println!("{}",new_device.fields[0]);
-                        println!("{}",new_device.fields[1]);
-                        println!("{}",new_device.fields[2]);
-
-                        println!("Discovered Commands:");
-                        println!("{}",new_device.commands[0]);
-                        println!("{}",new_device.commands[1]);
-                        println!("{}",new_device.commands[2]);
-
-                        //push those changes to the shared device list
-                        self.device_list.lock().await[index] = new_device;
-                        
-                        //success message
-                        println!("Discovered Fields and Commands saved");
-
-                    },
-                    // commands 2-255 are not reserved for any particular command 
-                    // (unlike 0 for emergency or 1 for discovery)
-                    // so they need to be matched to the commands for device that sent the response packet
-                    2..=255 =>{
-                        //retrieve the list of commands for the device that sent the packet
-                        //match the packet's cmd_type to the appropriate device-specific command
+                        // commands 2-255 are not reserved for any particular command 
+                        // (unlike 0 for emergency or 1 for discovery)
+                        // so they need to be matched to the commands for device that sent the response packet
+                        3..=255 =>{
+                            //retrieve the list of commands for the device that sent the packet
+                            //match the packet's cmd_type to the appropriate device-specific command
+                        }
                     }
-                }
-                
-            },
-            Err(e) => println!("failed to send command: {}", s!(e))
-        };
+                    
+                },
+                Err(e) => println!("failed to send command: {}", s!(e))
+            };
+        }
+
 
         Ok(())
 

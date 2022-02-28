@@ -34,8 +34,8 @@ impl CtrlSvc {
         loop {
             tokio::select!{
                 pkt = self.rx_auth.recv() => {
-                    //TODO: UNCOMMENT
-                    //println!("auth -> pod_state received");
+                    
+                    println!("auth -> pod_state received");
 
                     let mut response = Packet { //default packet
                         packet_id: s!["OPENLINK"],
@@ -48,14 +48,16 @@ impl CtrlSvc {
                     match pkt {
                         Some(packet) => response = self.command_handler(packet).await.unwrap(),
                         None => {
-                            //TODO: UNCOMMENT
-                            //println!("No packet here?!")
+                            
+                            println!("No packet here?!")
                         },
                     }
 
                     if let Err(e) = self.tx_auth.send(response).await{
-                        //TODO: UNCOMMENT
-                        //eprintln!("PodState->Auth failed: {}", e);
+                        
+                        eprintln!("PodState->Auth failed: {}", e);
+
+                        
                     }
                 }
             }
@@ -65,10 +67,12 @@ impl CtrlSvc {
     async fn command_handler(&mut self, pkt: Packet) -> Result<Packet, serde_json::Error> {
         println!("Command type: {}", pkt.cmd_type);
         let res: Packet = match pkt.cmd_type {
+            //64 is the beginning of the command space for ctrl_svc
             64 => self.get_state().await.unwrap(),
             69 => self.launch_pod().await.unwrap(),
             99 => self.engage_brakes().await.unwrap(),
             _ => Packet::new(0, vec![s!("Invalid command")]),
+            //127 is the end of the command space for ctrl_svc
         };
         Ok(res)
     }

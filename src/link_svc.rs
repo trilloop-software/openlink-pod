@@ -24,11 +24,14 @@ impl LinkSvc {
         while let Some(mut pkt) = self.rx_auth.recv().await {
             // process response based on cmd_type variable
             let res = match pkt.cmd_type {
+                //32 is the beginning of the command space for link_svc
                 32 => self.get_device_list().await.unwrap(),
                 33 => self.add_device(pkt.payload[0].clone()).await.unwrap(),
                 34 => self.update_device(pkt.payload[0].clone()).await.unwrap(),
                 35 => self.remove_device(pkt.payload[0].clone()).await.unwrap(),
+                62 => self.unlock_pod().await.unwrap(),
                 63 => self.lock_pod().await.unwrap(),
+                //63 is the end of the command space for link_svc
                 _ => s!["Command not implemented"]
             };
 
@@ -65,18 +68,37 @@ impl LinkSvc {
         serde_json::to_string(&self.device_list.lock().await.clone())
     }
 
-    /// Lock device_list to start TCP connections to embedded devices
-    /// in pod_conn_svc
+    /// Lock device_list to start TCP connections to embedded devices in pod_conn_svc
+    /// Once locked, devices cannot be edited in "Configure" page until the pod is unlocked
     async fn lock_pod(&self) -> Result<String, serde_json::Error> {
         println!("link_svc: lock_devices command received");
 
         //send lock command to pod_conn_svc
         if let Err(e) = self.tx_pod.send(1).await {
+            //if unsuccessful
+            //return error message
             println!("link->pod failed: {}", e);
         }
 
-        // returning new device_list
+        // if lock command was successful
+        // return new device_list
         self.get_device_list().await
+    }
+
+    // Unlock device_list to stop TCP connections to embedded devices in pod_conn_svc
+    // Once unlocked, devices can be re-configured in the "Configure page" until pod is locked again
+    async fn unlock_pod(&self)-> Result<String, serde_json::Error>{
+        println!("link_svc: unlock_devices command received");
+
+        //send unlock command to pod_conn_svc
+        if let Err(e) = self.tx_pod.send(2).await {
+            //if unsuccessful
+            //return error message
+            println!("link->pod failed: {}", e);
+        }
+
+        //return success message
+        Ok(s!["unlock successful"])
     }
 
     /// Find device received from client in device list and remove from vector

@@ -31,8 +31,8 @@ impl EmergSvc {
                             }
                         },
                         Err(e) => {
-                            //TODO: UNCOMMENT
-                            //eprintln!("emerg->pod failed: {}", e)
+                            
+                            eprintln!("emerg->pod failed: {}", e)
                         }
                     }
                 }
