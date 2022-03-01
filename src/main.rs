@@ -84,6 +84,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let link_svc = link_svc::LinkSvc { 
         device_list: Arc::clone(&device_list),
+        pod_state: Arc::clone(&pod_state),
         rx_auth: rx_auth_to_link,
         tx_auth: tx_link_to_auth,
         rx_pod: rx_pod_to_link,
@@ -99,7 +100,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let pod_conn_svc = pod_conn_svc::PodConnSvc {
         conn_list: Vec::new(),
         device_list: Arc::clone(&device_list),
-        pod_state: pod_state,
+        pod_state: Arc::clone(&pod_state),
         rx_ctrl: rx_ctrl_to_pod,
         tx_ctrl: tx_pod_to_ctrl,
         rx_emerg: rx_emerg_to_pod,

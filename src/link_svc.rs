@@ -4,9 +4,12 @@ use std::sync::Arc;
 use tokio::sync::{mpsc::Receiver, mpsc::Sender, Mutex};
 
 use super::{device::*, packet::*};
+use super::pod_conn_svc::PodState;
 
 pub struct LinkSvc {
     pub device_list: Arc<Mutex<Vec<Device>>>,
+    pub pod_state: Arc<Mutex<PodState>>,
+
     pub rx_auth: Receiver<Packet>,
     pub tx_auth: Sender<Packet>,
     pub rx_pod: Receiver<u8>,
@@ -51,16 +54,42 @@ impl LinkSvc {
         Ok(())
     }
 
+    async fn pod_is_unlocked(&mut self) -> bool {
+        match *self.pod_state.lock().await{
+
+            //return true if pod is in Unlocked state
+            PodState::Unlocked =>{
+                println!("Pod is Unlocked");
+                true
+            }
+            //otherwise, return false
+            _ => {
+                println!("Pod is NOT Unlocked");
+                false
+            }
+        }
+    }
+
     /// Add new device to device list
     /// 
     /// Return success message to client
     async fn add_device(&mut self, req: String) -> Result<String, serde_json::Error> {
-        println!("link_svc: add_device command received");
-        let dev: Device = serde_json::from_str(&req)?;
-        self.device_list.lock().await.push(dev);
-        println!("link_svc: device added");
 
-        Ok(s!["Device added"])
+        //only follow through with the command if pod is in Unlocked state
+        if self.pod_is_unlocked().await {
+            println!("link_svc: add_device command received");
+            let dev: Device = serde_json::from_str(&req)?;
+            self.device_list.lock().await.push(dev);
+            println!("link_svc: device added");
+    
+            Ok(s!["Device added"])
+        }
+        //otherwise, return a failure message
+        else{
+            Ok(s!["Pod must be unlocked first"])
+        }
+
+
     }
 
     async fn get_device_list(&self) -> Result<String, serde_json::Error> {
@@ -105,26 +134,44 @@ impl LinkSvc {
     /// 
     /// Return success message to client
     async fn remove_device(&mut self, req: String) -> Result<String, serde_json::Error> {
-        println!("link_svc: remove_device command received");
-        let dev: Device = serde_json::from_str(&req)?;
-        let index = self.device_list.lock().await.iter().position(|d| d.id == dev.id).unwrap();
-        self.device_list.lock().await.remove(index);
-        println!("link_svc: device removed");
 
-        Ok(s!["Device removed"])
+        //only follow through with the command if pod is in Unlocked state
+        if self.pod_is_unlocked().await {
+            println!("link_svc: remove_device command received");
+            let dev: Device = serde_json::from_str(&req)?;
+            let index = self.device_list.lock().await.iter().position(|d| d.id == dev.id).unwrap();
+            self.device_list.lock().await.remove(index);
+            println!("link_svc: device removed");
+    
+            Ok(s!["Device removed"])
+        }
+        //otherwise, return a failure message
+        else{
+            Ok(s!["Pod must be unlocked first"])
+        }
+
     }
 
     /// Find device received from client in device list and update where id matches
     /// 
     /// Return success message to the client
     async fn update_device(&mut self, req: String) -> Result<String, serde_json::Error> {
-        println!("link_svc: update_device command received");
-        let dev: Device = serde_json::from_str(&req)?;
-        let index = self.device_list.lock().await.iter().position(|d| d.id == dev.id).unwrap();
-        self.device_list.lock().await[index] = dev;
-        println!("link_svc: device updated");
 
-        Ok(s!["Device updated"])
+        //only follow through with the command if pod is in Unlocked state
+        if self.pod_is_unlocked().await {
+            println!("link_svc: update_device command received");
+            let dev: Device = serde_json::from_str(&req)?;
+            let index = self.device_list.lock().await.iter().position(|d| d.id == dev.id).unwrap();
+            self.device_list.lock().await[index] = dev;
+            println!("link_svc: device updated");
+    
+            Ok(s!["Device updated"])
+        }
+        //otherwise, return a failure message
+        else{
+            Ok(s!["Pod must be unlocked first"])
+        }
+
     }
 
     /// Temporary function to populate the device list
