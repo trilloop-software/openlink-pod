@@ -102,14 +102,19 @@ impl PodConnSvc {
     
                                         //send the discovery packet command
                                         //to each device
-                                        //for testing purposes, only send it to the first device
-                                        let res = match self.send_cmd(0,1).await{
-                                            Ok(()) => 1,
-                                            Err(()) => 0,
-                                        };
-                                        if let Err(e) = self.tx_link.send(res).await {
-                                            eprintln!("pod->link failed: {}", e);
-                                        };
+
+                                        let num = self.device_list.lock().await.len();
+
+                                        for index in 0..num{
+                                            let res = match self.send_cmd(index,1).await{
+                                                Ok(()) => 1,
+                                                Err(()) => 0,
+                                            };
+                                            if let Err(e) = self.tx_link.send(res).await {
+                                                eprintln!("pod->link failed: {}", e);
+                                            };
+                                        }
+
                                     },
                                     Err(()) => {
     
@@ -284,6 +289,7 @@ impl PodConnSvc {
                             new_device.commands = cmd_list;
 
                             // DEBUGGING PURPOSES
+                            println!("Device index: {}",index);
                             // print the new fields/commands
                             println!("Discovered Telemetry Fields:");
                             println!("{}",new_device.fields[0]);
@@ -294,6 +300,8 @@ impl PodConnSvc {
                             println!("{}",new_device.commands[0]);
                             println!("{}",new_device.commands[1]);
                             println!("{}",new_device.commands[2]);
+
+                            println!("--------------------");
 
                             // overwrite the original device in the list
                             // with the updated clone
