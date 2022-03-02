@@ -1,7 +1,7 @@
 use serde::{Serialize, Deserialize};
 use bincode::{serialize, deserialize};
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct PodPacket {
     pub packet_id: String,
     pub version: u8,

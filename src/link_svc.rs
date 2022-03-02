@@ -3,7 +3,9 @@ use serde_json;
 use std::sync::Arc;
 use tokio::sync::{mpsc::Receiver, mpsc::Sender, Mutex};
 
-use super::{device::*, packet::*};
+use crate::pod_packet_payload::*;
+
+use super::{device::*, packet::*, pod_packet::*};
 use super::pod_conn_svc::PodState;
 
 pub struct LinkSvc {
@@ -12,8 +14,8 @@ pub struct LinkSvc {
 
     pub rx_auth: Receiver<Packet>,
     pub tx_auth: Sender<Packet>,
-    pub rx_pod: Receiver<u8>,
-    pub tx_pod: Sender<u8>,
+    pub rx_pod: Receiver<PodPacket>,
+    pub tx_pod: Sender<PodPacket>,
 }
 
 /// link_svc adds/removes/modifies devices to/from the pod
@@ -32,6 +34,7 @@ impl LinkSvc {
                 33 => self.add_device(pkt.payload[0].clone()).await.unwrap(),
                 34 => self.update_device(pkt.payload[0].clone()).await.unwrap(),
                 35 => self.remove_device(pkt.payload[0].clone()).await.unwrap(),
+                36 => self.send_device_cmd(pkt.target_cmd_code, pkt.payload[0].clone()).await.unwrap(),
                 62 => self.unlock_pod().await.unwrap(),
                 63 => self.lock_pod().await.unwrap(),
                 //63 is the end of the command space for link_svc
@@ -103,7 +106,7 @@ impl LinkSvc {
         println!("link_svc: lock_devices command received");
 
         //send lock command to pod_conn_svc
-        if let Err(e) = self.tx_pod.send(1).await {
+        if let Err(e) = self.tx_pod.send(PodPacket::new(1,Vec::<u8>::new())).await {
             //if unsuccessful
             //return error message
             println!("link->pod failed: {}", e);
@@ -120,7 +123,7 @@ impl LinkSvc {
         println!("link_svc: unlock_devices command received");
 
         //send unlock command to pod_conn_svc
-        if let Err(e) = self.tx_pod.send(2).await {
+        if let Err(e) = self.tx_pod.send(PodPacket::new(2,Vec::<u8>::new())).await {
             //if unsuccessful
             //return error message
             println!("link->pod failed: {}", e);
@@ -174,48 +177,28 @@ impl LinkSvc {
 
     }
 
-    /// Temporary function to populate the device list
-    async fn populate_temp_data(&mut self) {
-        self.device_list.lock().await.push(Device { 
-            id: s!("yhvlwn1"),
-            name: s!("Battery 1"),
-            device_type: DeviceType::Battery,
-            ip_address: "127.0.0.1".parse().unwrap(),
-            port: 0,
-            connection_status: ConnectionStatus::Connected,
-            device_status: DeviceStatus::Operational,
-            fields: vec![ 
-                DeviceField { field_name: s!("Temperature"), field_value: s!("") },
-                DeviceField { field_name: s!("Power"), field_value: s!("") }
-            ] ,
-            commands: vec![] 
-        });
+    /// Get device and command code from client
+    /// Send the command to the corresponding device in device list
+    async fn send_device_cmd(&mut self, cmd_code: u8, req: String) -> Result<String, serde_json::Error> {
+        println!("link_svc: send_device_cmd command received");
 
-        self.device_list.lock().await.push(Device { 
-            id: s!("j5n4ook"),
-            name: s!("Inverter 1"),
-            device_type: DeviceType::Inverter,
-            ip_address: "127.0.0.1".parse().unwrap(),
-            port: 0,
-            connection_status: ConnectionStatus::Connected,
-            device_status: DeviceStatus::Unsafe,
-            fields: vec![ 
-                DeviceField { field_name: s!("Inverter Field 1"), field_value: s!("") },
-                DeviceField { field_name: s!("Inverter Field 2"), field_value: s!("") }
-            ] ,
-            commands: vec![] 
-        });
+        //recontruct the Device instance from the payload
+        let dev: Device = serde_json::from_str(&req)?;
 
-        self.device_list.lock().await.push(Device { 
-            id: s!("573vxfk"),
-            name: s!("Sensor 1"),
-            device_type: DeviceType::Sensor,
-            ip_address: "127.0.0.1".parse().unwrap(),
-            port: 0,
-            connection_status: ConnectionStatus::Disconnected,
-            device_status: DeviceStatus::Unsafe,
-            fields: vec![] ,
-            commands: vec![]  
-        });
+        //construct a payload that specifies the target device and target cmd code
+        let mut payload = PodPacketPayload::new();
+        payload.target_id = dev.id;
+        payload.target_cmd_code = cmd_code;
+
+        //tell pod_conn_svc to send the command to the appropriate device
+        if let Err(e) = self.tx_pod.send(PodPacket::new(3,encode_payload(payload))).await {
+            //if unsuccessful
+            //return error message
+            println!("link->pod failed: {}", e);
+        }
+
+        //return success message
+        Ok(s!["Cmd sent to device"])
     }
+
 }

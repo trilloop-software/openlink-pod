@@ -25,8 +25,8 @@ pub struct PodConnSvc {
     pub tx_ctrl: Sender<u8>,
     pub rx_emerg: Receiver<u8>,
     pub tx_emerg: Sender<u8>,
-    pub rx_link: Receiver<u8>,
-    pub tx_link: Sender<u8>,
+    pub rx_link: Receiver<PodPacket>,
+    pub tx_link: Sender<PodPacket>,
     //pub rx_tele: Receiver<i32>,
     //pub tx_tele: Sender<i32>,
 }
@@ -68,9 +68,14 @@ impl PodConnSvc {
                 }
 
                 //handle commands from link_svc
-                link_cmd = self.rx_link.recv() => {
+                packet = self.rx_link.recv() => {
+
+                    let pkt = packet.unwrap().clone();
+                    let link_cmd = pkt.cmd_type;
+                    let mut payload = decode_payload(pkt.payload);
+
                     //parse the command, and act based on it's command type
-                    match link_cmd.unwrap() {
+                    match link_cmd{
 
                         // lock cmd  
                         // start up all tcp connections
@@ -106,11 +111,11 @@ impl PodConnSvc {
                                         let num = self.device_list.lock().await.len();
 
                                         for index in 0..num{
-                                            let res = match self.send_cmd(index,1).await{
+                                            let res = match self.send_cmd(index,1, PodPacketPayload::new()).await{
                                                 Ok(()) => 1,
                                                 Err(()) => 0,
                                             };
-                                            if let Err(e) = self.tx_link.send(res).await {
+                                            if let Err(e) = self.tx_link.send(PodPacket::new(1,Vec::<u8>::new())).await {
                                                 eprintln!("pod->link failed: {}", e);
                                             };
                                         }
@@ -130,7 +135,7 @@ impl PodConnSvc {
                         2 =>{
                             let mut unlocked =true;
 
-                            //check if the pod is already locked before following through with the lock command
+                            //check if the pod is already locked before following through with the unlock command
                             match *self.pod_state.lock().await {
                                 PodState::Locked => {
                                     unlocked = false;
@@ -165,6 +170,43 @@ impl PodConnSvc {
                                     }
                                 };
                                 
+
+                            }
+
+                        }
+                        //send cmd to device command
+                        3=>{
+                            let index = self.device_list.lock().await.iter().position(|d| d.id == payload.target_id).unwrap();
+
+                            let mut unlocked =true;
+
+                            //check if the pod is already locked before sending the command
+                            match *self.pod_state.lock().await {
+                                PodState::Locked => {
+                                    unlocked = false;
+                                },
+                                PodState::Unlocked => {
+                                    // return fail message
+                                    eprintln!("Please lock the pod first");
+                                    //TODO: return an error message to link_svc
+
+                                }
+                                _ => {
+ 
+                                    //return fail message
+                                    eprintln!("Failed to send command to device");
+                                    //TODO: return an error message to link_svc
+
+                                }
+                            }
+                        
+                            //if pod is in Locked state
+                            //follow through with sending the command to the target device
+                            if(!unlocked){
+
+                                //the command code specified in the packet from link_svc
+                                //is the command code that the device will recognize
+                                self.send_cmd(index, payload.target_cmd_code, PodPacketPayload::new());
 
                             }
 
@@ -213,13 +255,13 @@ impl PodConnSvc {
         let size = self.device_list.lock().await.len();
 
         for index in 0..size{
-            self.send_cmd(index,2).await;
+            self.send_cmd(index,2, PodPacketPayload::new()).await;
         }
 
         Ok(())
     }
 
-    async fn send_cmd(&mut self, index:usize, cmd: u8)-> Result<(), ()> {
+    async fn send_cmd(&mut self, index:usize, cmd: u8, payload: PodPacketPayload)-> Result<(), ()> {
 
         // send command to associated devices
         //  -returns array of available commands and array of device fields
@@ -227,9 +269,6 @@ impl PodConnSvc {
         println!("sending cmd to device");
 
         //contruct the packet
-        //build payload contents based on command type
-
-        let mut payload = PodPacketPayload::new();
         let packet = encode(PodPacket::new(cmd, encode_payload(payload)));
 
         //send packet to the device
@@ -277,8 +316,8 @@ impl PodConnSvc {
 
                             //extract the list of new command anmes and their corresponding codes
                             let mut cmd_list = Vec::<DeviceCommand>::new();
-                            for index in 0..payload.command_values.len(){
-                                cmd_list.push(DeviceCommand::new(payload.command_names[index].clone(),payload.command_values[index]));
+                            for index in 0..payload.command_codes.len(){
+                                cmd_list.push(DeviceCommand::new(payload.command_names[index].clone(),payload.command_codes[index]));
                             }
 
                             // clone the target device from the shared device list
@@ -316,10 +355,13 @@ impl PodConnSvc {
                         2 =>{
                             println!("Error: received response to disconnect command");
                         }
-                        // commands 2-255 are not reserved for any particular command 
+
+                        3 => {
+
+                        }
+                        // commands 4-255 are not reserved for any particular command 
                         // (unlike 0 for emergency or 1 for discovery)
-                        // so they need to be matched to the commands for device that sent the response packet
-                        3..=255 =>{
+                        4..=255 =>{
                             //retrieve the list of commands for the device that sent the packet
                             //match the packet's cmd_type to the appropriate device-specific command
                         }

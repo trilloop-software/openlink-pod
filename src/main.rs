@@ -15,7 +15,9 @@ mod remote_conn_svc;
 mod emerg_svc;
 mod pod_conn_svc;
 mod ctrl_svc;
+
 use packet::*;
+use pod_packet::*;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -45,8 +47,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let (tx_emerg_to_pod, rx_emerg_to_pod) = mpsc::channel::<u8>(32);
 
     // link-pod
-    let (tx_link_to_pod, rx_link_to_pod) = mpsc::channel::<u8>(32);
-    let (tx_pod_to_link, rx_pod_to_link) = mpsc::channel::<u8>(32);
+    let (tx_link_to_pod, rx_link_to_pod) = mpsc::channel::<PodPacket>(32);
+    let (tx_pod_to_link, rx_pod_to_link) = mpsc::channel::<PodPacket>(32);
 
     // shared memory
     let device_list: Vec<device::Device> = Vec::new();

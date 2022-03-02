@@ -31,7 +31,7 @@ pub struct Device {
     pub connection_status: ConnectionStatus,
     pub device_status: DeviceStatus,
     pub fields: Vec<DeviceField>,
-    pub commands: Vec<DeviceCommand>
+    pub commands: Vec<DeviceCommand>,
 }
 
 #[derive(Serialize, Deserialize, Clone)]

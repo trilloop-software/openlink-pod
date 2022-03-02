@@ -42,6 +42,7 @@ impl CtrlSvc {
                         version: 1,
                         cmd_type: 0,
                         timestamp: std::time::SystemTime::now(),
+                        target_cmd_code:0,
                         payload: vec!["Error".to_string()]
                     };
 

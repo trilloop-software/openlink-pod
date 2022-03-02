@@ -6,25 +6,30 @@ use bincode::{serialize, deserialize};
 //template used in discovery packets
 pub struct PodPacketPayload {
 
+    pub target_id: String,
+    pub target_cmd_code: u8,
     pub field_names: Vec<String>,
-    pub field_values: Vec<String>, //field data is parsed to a string for now. Since there are too many possible data types (u8,i32,etc)
+    pub telemetry_data: Vec<u8>, //assume all data is of type u8 for now (maybe make this Vec<Vec<u8>> later?)
     pub command_names: Vec<String>,
-    pub command_values: Vec<u8>,
+    pub command_codes: Vec<u8>,
 }
 
 impl PodPacketPayload {
     pub fn new() -> Self {
         Self {
+            target_id: s![""],
+            target_cmd_code: 0,
             field_names: Vec::new(),
-            field_values: Vec::new(), 
+            telemetry_data: Vec::new(), //assume all data is of type u8 for now (maybe make this Vec<byte array> later?)
             command_names: Vec::new(),
-            command_values: Vec::new(),
+            command_codes: Vec::new(),
         }
     }
     
 }
 
 pub fn decode_payload(pkt: Vec<u8>) -> PodPacketPayload {
+
     deserialize(&pkt[..]).unwrap()
 }
 

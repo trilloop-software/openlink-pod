@@ -8,6 +8,7 @@ pub struct Packet {
     pub version: u8,
     pub cmd_type: u8,
     pub timestamp: SystemTime,
+    pub target_cmd_code: u8, //command to be sent to the device in the payload
     pub payload: Vec<String>
 }
 
@@ -18,6 +19,7 @@ impl Packet {
             version: 1,
             cmd_type: cmd_type,
             timestamp: std::time::SystemTime::now(),
+            target_cmd_code:0,
             payload: payload
         }
     }
