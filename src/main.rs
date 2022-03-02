@@ -8,7 +8,6 @@ mod macros;
 mod auth_svc;
 mod device;
 mod link_svc;
-mod packet;
 mod pod_packet;
 mod pod_packet_payload;
 mod remote_conn_svc;
@@ -16,7 +15,7 @@ mod emerg_svc;
 mod pod_conn_svc;
 mod ctrl_svc;
 
-use packet::*;
+use openlink_packets::{remote_conn_packet::*};
 use pod_packet::*;
 
 #[tokio::main]
@@ -24,16 +23,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Create control signals to communicate between services
 
     // auth-remote
-    let (tx_auth_to_remote, rx_auth_to_remote) = mpsc::channel::<Packet>(32);
-    let (tx_remote_to_auth, rx_remote_to_auth) = mpsc::channel::<Packet>(32);
+    let (tx_auth_to_remote, rx_auth_to_remote) = mpsc::channel::<RemotePacket>(32);
+    let (tx_remote_to_auth, rx_remote_to_auth) = mpsc::channel::<RemotePacket>(32);
 
     // auth-link
-    let (tx_auth_to_link, rx_auth_to_link) = mpsc::channel::<Packet>(32);
-    let (tx_link_to_auth, rx_link_to_auth) = mpsc::channel::<Packet>(32);
+    let (tx_auth_to_link, rx_auth_to_link) = mpsc::channel::<RemotePacket>(32);
+    let (tx_link_to_auth, rx_link_to_auth) = mpsc::channel::<RemotePacket>(32);
 
     // auth-ctrl
-    let (tx_auth_to_ctrl, rx_auth_to_ctrl) = mpsc::channel::<Packet>(32);
-    let (tx_ctrl_to_auth, rx_ctrl_to_auth) = mpsc::channel::<Packet>(32);
+    let (tx_auth_to_ctrl, rx_auth_to_ctrl) = mpsc::channel::<RemotePacket>(32);
+    let (tx_ctrl_to_auth, rx_ctrl_to_auth) = mpsc::channel::<RemotePacket>(32);
 
     // remote-emerg (only one channel needed because nothing is being sent back to client)
     let (tx_remote_to_emerg, rx_remote_to_emerg) = mpsc::channel::<u8>(32);

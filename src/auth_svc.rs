@@ -1,17 +1,17 @@
 use anyhow::{Result};
 use tokio::sync::{mpsc::Receiver, mpsc::Sender};
 
-use super::packet::*;
+use openlink_packets::{remote_conn_packet::*};
 
 pub struct AuthSvc {
-    pub rx_remote: Receiver<Packet>,
-    pub tx_remote: Sender<Packet>,
+    pub rx_remote: Receiver<RemotePacket>,
+    pub tx_remote: Sender<RemotePacket>,
 
-    pub rx_link: Receiver<Packet>,
-    pub tx_link: Sender<Packet>,
+    pub rx_link: Receiver<RemotePacket>,
+    pub tx_link: Sender<RemotePacket>,
     
-    pub rx_ctrl: Receiver<Packet>,
-    pub tx_ctrl: Sender<Packet>
+    pub rx_ctrl: Receiver<RemotePacket>,
+    pub tx_ctrl: Sender<RemotePacket>
 }
 
 impl AuthSvc {
@@ -23,7 +23,7 @@ impl AuthSvc {
         while let Some(pkt) = self.rx_remote.recv().await {
             // send packet to associated service based on cmd_type field range
             println!("Packet of type {} received", pkt.cmd_type);
-            let resp: Packet = match pkt.cmd_type {
+            let resp: RemotePacket = match pkt.cmd_type {
                 0..=31 => {
                     // auth service command handling
                     pkt

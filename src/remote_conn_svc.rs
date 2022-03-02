@@ -6,11 +6,11 @@ use std::{error::Error, sync::Arc};
 use tracing::{error, info};
 use tokio::sync::{mpsc::Receiver, mpsc::Sender};
 
-use super::packet::*;
+use openlink_packets::{remote_conn_packet::*};
 
 pub struct RemoteConnSvc {
-    pub rx_auth: Receiver<Packet>,
-    pub tx_auth: Sender<Packet>,
+    pub rx_auth: Receiver<RemotePacket>,
+    pub tx_auth: Sender<RemotePacket>,
     pub tx_emerg: Sender<u8>,
 }
 
@@ -88,12 +88,12 @@ impl RemoteConnSvc {
     }
 
     /// Receive request from RecvStream
-    /// Decode buffer into valid OpenLink Packet
+    /// Decode buffer into valid OpenLink RemotePacket
     /// Send response on SendStream
     async fn handle_request(&mut self, (mut send, recv): (quinn::SendStream, quinn::RecvStream)) -> Result<()> {
         let req = match recv.read_to_end(64 * 1024).await {
             Ok(req) => req,
-            Err(e) => encode(Packet::new(0, vec![s!(e)]))
+            Err(e) => encode(RemotePacket::new(0, vec![s!(e)]))
         };
 
         let pkt = decode(req);
@@ -122,14 +122,14 @@ impl RemoteConnSvc {
     /// Receive the result from the auth service and update timestamp
     /// If request to auth_svc errored, return the error as the payload and update timestamp
     /// Return packet as buffer
-    async fn process_packet(&mut self, pkt: Packet) -> Result<Vec<u8>> {
+    async fn process_packet(&mut self, pkt: RemotePacket) -> Result<Vec<u8>> {
         let pkt = match self.tx_auth.send(pkt).await {
             Ok(()) => {
                 let resp = self.rx_auth.recv().await.unwrap();
-                Packet::new(resp.cmd_type, resp.payload)
+                RemotePacket::new(resp.cmd_type, resp.payload)
             },
             Err(e) => {
-                Packet::new(0, vec![s!(e)])
+                RemotePacket::new(0, vec![s!(e)])
             }
         };
         

@@ -5,15 +5,16 @@ use tokio::sync::{mpsc::Receiver, mpsc::Sender, Mutex};
 
 use crate::pod_packet_payload::*;
 
-use super::{device::*, packet::*, pod_packet::*};
+use openlink_packets::{remote_conn_packet::*};
+use super::{device::*, pod_packet::*};
 use super::pod_conn_svc::PodState;
 
 pub struct LinkSvc {
     pub device_list: Arc<Mutex<Vec<Device>>>,
     pub pod_state: Arc<Mutex<PodState>>,
 
-    pub rx_auth: Receiver<Packet>,
-    pub tx_auth: Sender<Packet>,
+    pub rx_auth: Receiver<RemotePacket>,
+    pub tx_auth: Sender<RemotePacket>,
     pub rx_pod: Receiver<PodPacket>,
     pub tx_pod: Sender<PodPacket>,
 }
@@ -62,12 +63,12 @@ impl LinkSvc {
 
             //return true if pod is in Unlocked state
             PodState::Unlocked =>{
-                println!("Pod is Unlocked");
+                println!("Checking Pod State: Unlocked");
                 true
             }
             //otherwise, return false
             _ => {
-                println!("Pod is NOT Unlocked");
+                println!("Checking Pod State: NOT Unlocked");
                 false
             }
         }
@@ -106,7 +107,7 @@ impl LinkSvc {
         println!("link_svc: lock_devices command received");
 
         //send lock command to pod_conn_svc
-        if let Err(e) = self.tx_pod.send(PodPacket::new(1,Vec::<u8>::new())).await {
+        if let Err(e) = self.tx_pod.send(PodPacket::new(1,encode_payload(PodPacketPayload::new()))).await {
             //if unsuccessful
             //return error message
             println!("link->pod failed: {}", e);
@@ -123,7 +124,7 @@ impl LinkSvc {
         println!("link_svc: unlock_devices command received");
 
         //send unlock command to pod_conn_svc
-        if let Err(e) = self.tx_pod.send(PodPacket::new(2,Vec::<u8>::new())).await {
+        if let Err(e) = self.tx_pod.send(PodPacket::new(2,encode_payload(PodPacketPayload::new()))).await {
             //if unsuccessful
             //return error message
             println!("link->pod failed: {}", e);
