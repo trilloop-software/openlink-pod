@@ -1,3 +1,4 @@
+use boringauth::pass::derive_password;
 use rusqlite::{params, Connection, Result};
 
 pub fn cleanup(conn: &Connection) -> Result<()> {
@@ -34,10 +35,10 @@ pub fn create(conn: &Connection) -> Result<()> {
     // create devices table
     match conn.execute(
         "CREATE TABLE devices (
-                id          STRING PRIMARY KEY,
-                name        STRING,
+                id          TEXT PRIMARY KEY,
+                name        TEXT,
                 device_type BLOB,
-                ip_address  STRING,
+                ip_address  TEXT,
                 port        INTEGER
                 )",
         []
@@ -61,14 +62,24 @@ pub fn create(conn: &Connection) -> Result<()> {
     // create users table
     match conn.execute(
         "CREATE TABLE users (
-                id      INTEGER PRIMARY KEY,
-                name    STRING
+                name    TEXT PRIMARY KEY,
+                hash    TEXT,
+                ugroup   INTEGER
                 )",
         []
     ) {
         Ok(_) => println!("database_svc: users table created"),
         Err(e) => eprintln!("database_svc: ERROR users table was not created, {}", e)
     };
+
+    // generate default admin account
+    match conn.execute(
+        "INSERT INTO users (name, hash, ugroup) VALUES (?1, ?2, ?3)",
+        params!["admin", derive_password(super::ADMIN_PASS).unwrap(), 0]
+    ) {
+        Ok(_) => println!("database_svc: admin account created"),
+        Err(e) => eprintln!("database_svc: ERROR creating admin account, {}", e)
+    }
 
     Ok(())
 }
