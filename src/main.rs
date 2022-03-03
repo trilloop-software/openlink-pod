@@ -14,6 +14,7 @@ mod remote_conn_svc;
 mod emerg_svc;
 mod pod_conn_svc;
 mod ctrl_svc;
+mod database_svc;
 
 use openlink_packets::{remote_conn_packet::*};
 use pod_packet::*;
@@ -112,6 +113,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         //tx_tele: todo!(),
     };
 
+    let database_svc = database_svc::DatabaseSvc {
+
+    };
+
     // Spawn all services as tasks
     spawn(auth_svc.run());
     spawn(link_svc.run());
@@ -119,6 +124,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     spawn(emerg_svc.run());
     spawn(ctrl_svc.run());
     spawn(pod_conn_svc.run());
+    spawn(database_svc.run());
 
     loop {
 
