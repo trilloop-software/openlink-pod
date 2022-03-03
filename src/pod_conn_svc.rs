@@ -1,6 +1,6 @@
 use super::pod_packet::*;
 use super::pod_packet_payload::*;
-use super::device::*;
+use shared::device::*;
 
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
@@ -18,7 +18,7 @@ pub enum PodState {
 pub struct PodConnSvc {
     pub conn_list: Vec<TcpStream>,
     
-    pub device_list: Arc<Mutex<Vec<super::device::Device>>>,
+    pub device_list: Arc<Mutex<Vec<Device>>>,
     pub pod_state: Arc<Mutex<PodState>>,
 
     pub rx_ctrl: Receiver<u8>,

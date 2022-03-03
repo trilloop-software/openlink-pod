@@ -1,13 +1,10 @@
-use anyhow::{/*anyhow, */Result};
+use anyhow::Result;
 use serde_json;
 use std::sync::Arc;
 use tokio::sync::{mpsc::Receiver, mpsc::Sender, Mutex};
 
-use crate::pod_packet_payload::*;
-
-use openlink_packets::{remote_conn_packet::*};
-use super::{device::*, pod_packet::*};
-use super::pod_conn_svc::PodState;
+use shared::{remote_conn_packet::*, device::*};
+use super::{pod_packet::*, pod_packet_payload::*, pod_conn_svc::PodState};
 
 pub struct LinkSvc {
     pub device_list: Arc<Mutex<Vec<Device>>>,

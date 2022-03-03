@@ -6,7 +6,6 @@ use tokio::{spawn, sync::{mpsc, Mutex}};
 mod macros;
 
 mod auth_svc;
-mod device;
 mod link_svc;
 mod pod_packet;
 mod pod_packet_payload;
@@ -15,8 +14,9 @@ mod emerg_svc;
 mod pod_conn_svc;
 mod ctrl_svc;
 mod database_svc;
+mod user;
 
-use openlink_packets::{remote_conn_packet::*};
+use shared::{remote_conn_packet::*, device::*};
 use pod_packet::*;
 
 #[tokio::main]
@@ -51,7 +51,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let (tx_pod_to_link, rx_pod_to_link) = mpsc::channel::<PodPacket>(32);
 
     // shared memory
-    let device_list: Vec<device::Device> = Vec::new();
+    let device_list: Vec<Device> = Vec::new();
     let device_list = Arc::new(Mutex::new(device_list));
     let pod_state = Arc::new(Mutex::new(pod_conn_svc::PodState::Unlocked));
 

@@ -11,7 +11,7 @@ Launches pod
 Payload should be a bool to engage/disengage
 */
 
-use openlink_packets::{remote_conn_packet::*};
+use shared::{remote_conn_packet::*};
 use super::pod_conn_svc::PodState;
 
 pub struct CtrlSvc { 
