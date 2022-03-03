@@ -13,10 +13,10 @@ log = { version = "0.4", features = ["std"] }
 quinn = "0.8"
 rcgen = "0.8"
 ring = "0.16"
+rusqlite = "0.27"
 rustls = { version = "0.20", features = ["quic"] }
 serde = { version = "1.0.133", features = ["derive"] }
 serde_json = "1.0"
 tokio = { version = "1.15", features = ["full"] }
 tracing = "0.1"
-#unqlite = "1.5"
 openlink-packets = { path = "../packets" }
