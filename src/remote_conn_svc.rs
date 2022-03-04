@@ -126,7 +126,7 @@ impl RemoteConnSvc {
         let pkt = match self.tx_auth.send(pkt).await {
             Ok(()) => {
                 let resp = self.rx_auth.recv().await.unwrap();
-                RemotePacket::new(resp.cmd_type, resp.payload)
+                RemotePacket::new_with_auth(resp.cmd_type, resp.payload, resp.token)
             },
             Err(e) => {
                 RemotePacket::new(0, vec![s!(e)])

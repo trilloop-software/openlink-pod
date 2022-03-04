@@ -1,13 +1,19 @@
 use rusqlite::{Connection, Result};
+use tokio::sync::{mpsc::Receiver, mpsc::Sender};
 
+use super::user::User;
+
+pub mod devices;
 mod schema;
+pub mod telemetry;
+pub mod users;
 
 const DB_VER: f32 = 0.1;
 const ADMIN_PASS: &str = "password";
 
 pub struct DatabaseSvc {
-    //pub rx_auth: Receiver<>,
-    //pub tx_auth: Sender<>,
+    pub rx_auth: Receiver<super::RemotePacket>,
+    pub tx_auth: Sender<super::RemotePacket>,
     //pub rx_link: Receiver<>,
     //pub tx_link: Sender<>,
     //pub rx_tele: Receiver<>,
@@ -37,19 +43,44 @@ impl DatabaseSvc {
         }
 
         loop {
-            /*tokio::select! {
-                /*_ = self.rx_auth.recv() => {
-
+            tokio::select! {
+                Some(mut pkt) = self.rx_auth.recv() => {
+                    let res = match pkt.cmd_type {
+                        160 => {
+                            pkt
+                        },
+                        161 => {
+                            let user: User = serde_json::from_str(&pkt.payload[0]).unwrap();
+                            pkt.payload[0] = serde_json::to_string(&users::get_user(&conn, user.name)).unwrap();
+                            pkt
+                        },
+                        162 => {
+                            pkt
+                        },
+                        163 => {
+                            pkt
+                        },
+                        164 => {
+                            pkt
+                        },
+                        _ => {
+                            pkt
+                        }
+                    };
+                    
+                    if let Err(e) = self.tx_auth.send(res).await {
+                        eprintln!("data->auth failed: {}", e);
+                    }
                 }
 
-                _ = self.rx_link.recv() => {
+                /*_ = self.rx_link.recv() => {
 
                 }
 
                 _ = self.rx_tele.recv() => {
 
                 }*/
-            }*/
+            }
         }
     }
 }

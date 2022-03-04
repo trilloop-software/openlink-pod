@@ -50,6 +50,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let (tx_link_to_pod, rx_link_to_pod) = mpsc::channel::<PodPacket>(32);
     let (tx_pod_to_link, rx_pod_to_link) = mpsc::channel::<PodPacket>(32);
 
+    // auth-data
+    let (tx_auth_to_data, rx_auth_to_data) = mpsc::channel::<RemotePacket>(32);
+    let (tx_data_to_auth, rx_data_to_auth) = mpsc::channel::<RemotePacket>(32);
+
     // shared memory
     let device_list: Vec<Device> = Vec::new();
     let device_list = Arc::new(Mutex::new(device_list));
@@ -65,6 +69,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         rx_ctrl: rx_ctrl_to_auth,
         tx_ctrl: tx_auth_to_ctrl,
+
+        rx_data: rx_data_to_auth,
+        tx_data: tx_auth_to_data,
     };
 
     let emerg_svc = emerg_svc::EmergSvc {
@@ -114,7 +121,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     };
 
     let database_svc = database_svc::DatabaseSvc {
-
+        rx_auth: rx_auth_to_data,
+        tx_auth: tx_data_to_auth,
     };
 
     // Spawn all services as tasks

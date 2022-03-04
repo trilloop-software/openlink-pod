@@ -1,7 +1,18 @@
 use anyhow::{Result};
+use boringauth::pass::is_valid;
+use serde::{Deserialize, Serialize};
 use tokio::sync::{mpsc::Receiver, mpsc::Sender};
 
-use openlink_packets::{remote_conn_packet::*};
+use shared::{login::LoginCredentials, remote_conn_packet::*};
+use super::user::User;
+
+const SECRET_KEY: &[u8; 8] = b"openlink";
+
+#[derive(Serialize, Deserialize)]
+struct Claims {
+    exp: usize,
+    ugroup: u8
+}
 
 pub struct AuthSvc {
     pub rx_remote: Receiver<RemotePacket>,
@@ -11,7 +22,10 @@ pub struct AuthSvc {
     pub tx_link: Sender<RemotePacket>,
     
     pub rx_ctrl: Receiver<RemotePacket>,
-    pub tx_ctrl: Sender<RemotePacket>
+    pub tx_ctrl: Sender<RemotePacket>,
+
+    pub rx_data: Receiver<RemotePacket>,
+    pub tx_data: Sender<RemotePacket>
 }
 
 impl AuthSvc {
@@ -26,21 +40,29 @@ impl AuthSvc {
             let resp: RemotePacket = match pkt.cmd_type {
                 0..=31 => {
                     // auth service command handling
-                    pkt
+                    self.auth_handler(&pkt).await.unwrap()
                 },
                 32..=63 => {
                     // link service command handling
-                    if let Err(e) = self.tx_link.send(pkt).await {
-                        eprintln!("auth->link failed: {}", e);
+                    if self.check_token(pkt.token.clone()) == 0 {
+                        RemotePacket::new(0, vec![s!("Not authorized")])
+                    } else {
+                        if let Err(e) = self.tx_link.send(pkt).await {
+                            eprintln!("auth->link failed: {}", e);
+                        }
+                        self.rx_link.recv().await.unwrap()
                     }
-                    self.rx_link.recv().await.unwrap()
                 },
                 64..=127 => {
                     // pod state service command handling
-                    if let Err(e) = self.tx_ctrl.send(pkt).await {
-                        eprintln!("auth->launch failed: {}", e);
+                    if self.check_token(pkt.token.clone()) == 0 {
+                        RemotePacket::new(0, vec![s!("Not authorized")])
+                    } else {
+                        if let Err(e) = self.tx_ctrl.send(pkt).await {
+                            eprintln!("auth->launch failed: {}", e);
+                        }
+                        self.rx_ctrl.recv().await.unwrap()
                     }
-                    self.rx_ctrl.recv().await.unwrap()
                 },
                 128..=159 => {
                     // telemetry service command handling
@@ -70,5 +92,59 @@ impl AuthSvc {
         println!("auth_svc down");
 
         Ok(())
+    }
+
+    async fn auth_handler(&mut self, pkt: &RemotePacket) -> Result<RemotePacket> {
+        let resp = match pkt.cmd_type {
+            1 => self.login(&pkt).await,
+            _ => RemotePacket::new(0, vec![s!("Command not implemented")])
+        };
+
+        Ok(resp)
+    }
+
+    fn check_token(&self, token: String) -> u8 {
+        let validation = jsonwebtoken::Validation::new(jsonwebtoken::Algorithm::HS256);
+
+        match jsonwebtoken::decode::<Claims>(&token, &jsonwebtoken::DecodingKey::from_secret(SECRET_KEY), &validation) {
+            Ok(c) => c.claims.ugroup,
+            Err(_) => 0
+        }
+    }
+
+    fn generate_token(&self, ugroup: u8) -> String {
+        let claims = Claims {
+            exp: 10000000000,
+            ugroup
+        };
+
+        match jsonwebtoken::encode(&jsonwebtoken::Header::default(), &claims, &jsonwebtoken::EncodingKey::from_secret(SECRET_KEY)) {
+            Ok(token) => token,
+            Err(_) => s!("")
+        }
+    }
+
+    async fn login(&mut self, pkt: &RemotePacket) -> RemotePacket {
+        let credentials: LoginCredentials = serde_json::from_str(&pkt.payload[0].clone()).unwrap();
+        let user = User::new(credentials.username.clone(), s!("pwd"), 0);
+        let user = serde_json::to_string(&user).unwrap();
+
+        self.tx_data.send(RemotePacket::new(161, vec![user])).await;
+        let resp = self.rx_data.recv().await.unwrap();
+        
+        match serde_json::from_str::<User>(&resp.payload[0]) {
+            Ok(user) => {
+                if is_valid(&credentials.password, &user.hash) {
+                    RemotePacket::new_with_auth(1, vec![s!("Authenticated")], self.generate_token(user.ugroup))
+                } else {
+                    if user.name == "" {
+                        RemotePacket::new(0, vec![s!("User not found")])
+                    } else {
+                        RemotePacket::new(0, vec![s!("Wrong password")])
+                    }
+                }
+            },
+            Err(_) => RemotePacket::new(0, vec![s!("Login Error")])
+        }
     }
 }
