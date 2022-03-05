@@ -16,7 +16,7 @@ pub struct User {
 impl User {
     pub fn new(name: String, pwd: String, ugroup: u8) -> Self {
         Self {
-            name,
+            name: name.to_lowercase(),
             hash: match derive_password(&pwd) {
                 Ok(hash) => hash,
                 Err(_) => s!("")
