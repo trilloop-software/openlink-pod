@@ -25,14 +25,6 @@ impl User {
         }
     }
 
-    pub fn change_pwd(mut self, pwd: String) {
-        self.hash = derive_password(&pwd).unwrap();
-    }
-
-    pub fn change_ugroup(mut self, ugroup: u8) {
-        self.ugroup = ugroup;
-    }
-
     pub fn from_sql(name: String, hash: String, ugroup: u8) -> Self {
         Self {
             name,
@@ -41,3 +33,4 @@ impl User {
         }
     }
 }
+

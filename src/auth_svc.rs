@@ -70,7 +70,14 @@ impl AuthSvc {
                 },
                 160..=195 => {
                     // database service command handling
-                    pkt
+                    if self.check_token(pkt.token.clone()) == 0 {
+                        RemotePacket::new(0, vec![s!("Not authorized")])
+                    } else {
+                        if let Err(e) = self.tx_data.send(pkt).await {
+                            eprintln!("auth->database failed: {}", e);
+                        }
+                        self.rx_data.recv().await.unwrap()
+                    }
                 },
                 196..=227 => {
                     // extra?
@@ -85,7 +92,7 @@ impl AuthSvc {
 
             // send the modified packet back to remote_conn_svc
             if let Err(e) = self.tx_remote.send(resp).await {
-                eprintln!("auth->remote failed: {}", e)
+                eprintln!("auth->remote failed: {}", e);
             }
         }
 
@@ -129,7 +136,10 @@ impl AuthSvc {
         let user = User::new(credentials.username.clone(), s!("pwd"), 0);
         let user = serde_json::to_string(&user).unwrap();
 
-        self.tx_data.send(RemotePacket::new(161, vec![user])).await;
+        if let Err(e) = self.tx_data.send(RemotePacket::new(161, vec![user])).await {
+            eprintln!("auth->database failed: {}", e);
+        }
+        
         let resp = self.rx_data.recv().await.unwrap();
         
         match serde_json::from_str::<User>(&resp.payload[0]) {

@@ -44,29 +44,8 @@ impl DatabaseSvc {
 
         loop {
             tokio::select! {
-                Some(mut pkt) = self.rx_auth.recv() => {
-                    let res = match pkt.cmd_type {
-                        160 => {
-                            pkt
-                        },
-                        161 => {
-                            let user: User = serde_json::from_str(&pkt.payload[0]).unwrap();
-                            pkt.payload[0] = serde_json::to_string(&users::get_user(&conn, user.name)).unwrap();
-                            pkt
-                        },
-                        162 => {
-                            pkt
-                        },
-                        163 => {
-                            pkt
-                        },
-                        164 => {
-                            pkt
-                        },
-                        _ => {
-                            pkt
-                        }
-                    };
+                Some(pkt) = self.rx_auth.recv() => {
+                    let res = users::handler(&conn, pkt);
                     
                     if let Err(e) = self.tx_auth.send(res).await {
                         eprintln!("data->auth failed: {}", e);
