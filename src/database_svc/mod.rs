@@ -3,9 +3,9 @@ use tokio::sync::{mpsc::Receiver, mpsc::Sender};
 
 use super::user::User;
 
-pub mod devices;
+//pub mod devices;
 mod schema;
-pub mod telemetry;
+//pub mod telemetry;
 pub mod users;
 
 const DB_VER: f32 = 0.1;

@@ -331,14 +331,17 @@ impl PodConnSvc {
                             println!("Device index: {}",index);
                             // print the new fields/commands
                             println!("Discovered Telemetry Fields:");
-                            println!("{}",new_device.fields[0]);
-                            println!("{}",new_device.fields[1]);
-                            println!("{}",new_device.fields[2]);
+                            for field in new_device.fields.clone()
+                            {
+                                println!("{}", field);
+                            }
 
                             println!("Discovered Commands:");
-                            println!("{}",new_device.commands[0]);
-                            println!("{}",new_device.commands[1]);
-                            println!("{}",new_device.commands[2]);
+                            for cmd in new_device.commands.clone()
+                            {
+                                println!("{}", cmd);
+                            }
+
 
                             println!("--------------------");
 
