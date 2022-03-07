@@ -1,7 +1,7 @@
 use rusqlite::{Connection, Result};
 use tokio::sync::{mpsc::Receiver, mpsc::Sender};
 
-use super::user::User;
+use super::RemotePacket;
 
 //pub mod devices;
 mod schema;
@@ -12,8 +12,8 @@ const DB_VER: f32 = 0.1;
 const ADMIN_PASS: &str = "password";
 
 pub struct DatabaseSvc {
-    pub rx_auth: Receiver<super::RemotePacket>,
-    pub tx_auth: Sender<super::RemotePacket>,
+    pub rx_auth: Receiver<RemotePacket>,
+    pub tx_auth: Sender<RemotePacket>,
     //pub rx_link: Receiver<>,
     //pub tx_link: Sender<>,
     //pub rx_tele: Receiver<>,

@@ -60,7 +60,7 @@ pub fn create(conn: &Connection) -> Result<()> {
     // create telemetry table
     match conn.execute(
         "CREATE TABLE telemetry (
-                time        INTEGER,
+                time        INTEGER PRIMARY KEY,
                 data        BLOB
                 )",
         []) {

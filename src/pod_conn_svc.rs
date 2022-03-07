@@ -72,7 +72,7 @@ impl PodConnSvc {
 
                     let pkt = packet.unwrap().clone();
                     let link_cmd = pkt.cmd_type;
-                    let mut payload = decode_payload(pkt.payload);
+                    let payload = decode_payload(pkt.payload);
 
                     //parse the command, and act based on it's command type
                     match link_cmd{
@@ -99,7 +99,7 @@ impl PodConnSvc {
                                 }
                             }
 
-                            if(unlocked){
+                            if unlocked {
 
                                 //open TCP connections to all devices
                                 match self.populate_conn_list().await {
@@ -157,7 +157,7 @@ impl PodConnSvc {
                         
                             //if pod is in Locked state
                             //follow through with setting it to Unlocked state
-                            if(!unlocked){
+                            if !unlocked {
                                 *self.pod_state.lock().await = PodState::Unlocked;
 
                                 //close TCP connections to all devices
@@ -202,7 +202,7 @@ impl PodConnSvc {
                         
                             //if pod is in Locked state
                             //follow through with sending the command to the target device
-                            if(!unlocked){
+                            if !unlocked {
 
                                 //the command code specified in the packet from link_svc
                                 //is the command code that the device will recognize
@@ -273,12 +273,12 @@ impl PodConnSvc {
 
         //send packet to the device
         match self.conn_list[index].write_all(&packet).await{
-            Ok(res) => println!("successfully sent command"),
+            Ok(()) => println!("successfully sent command"),
             Err(e) => println!("failed to send command: {}", s!(e))
         };
 
         //determine if response packet is expected
-        if(cmd ==2){
+        if cmd ==2 {
 
         }
         else{
@@ -362,9 +362,9 @@ impl PodConnSvc {
                         3 => {
 
                         }
-                        // commands 4-255 are not reserved for any particular command 
-                        // (unlike 0 for emergency or 1 for discovery)
-                        4..=255 =>{
+                        // commands 4-254 are not reserved for any particular command 
+                        // (unlike 255 for emergency or 1 for discovery)
+                        4..=254 =>{
                             //retrieve the list of commands for the device that sent the packet
                             //match the packet's cmd_type to the appropriate device-specific command
                         }
