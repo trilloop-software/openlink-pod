@@ -1,7 +1,7 @@
 use anyhow::{Result};
 use tokio::sync::{mpsc::Receiver, mpsc::Sender, Mutex};
 use serde_json;
-use std::sync::Arc;
+use std::{sync::Arc, ops::Range};
 /* POD STATE COMMANDS
 64 - Get state
 Returns PodState
@@ -11,10 +11,13 @@ Launches pod
 Payload should be a bool to engage/disengage
 */
 
-use shared::{remote_conn_packet::*};
+use shared::{launch::*, remote_conn_packet::*};
 use super::pod_conn_svc::PodState;
+const DIST_RANGE: Range<f32> = 0.0..250.0;
+const SPEED_RANGE: Range<f32> = 0.0..111.0;
 
 pub struct CtrlSvc { 
+    pub launch_params: Arc<Mutex<LaunchParams>>,
 
     //State things
     pub pod_state: Arc<Mutex<PodState>>,
@@ -29,55 +32,41 @@ pub struct CtrlSvc {
 
 impl CtrlSvc {
     pub async fn run(mut self) -> Result<()> {
-        println!("pod_state_svc: service running");
+        println!("ctrl_svc: service running");
 
-        loop {
-            tokio::select!{
-                pkt = self.rx_auth.recv() => {
-                    
-                    println!("auth -> pod_state received");
+        while let Some(pkt) = self.rx_auth.recv().await {
+            println!("Command type: {}", pkt.cmd_type);
 
-                    //construct a default packet (cmd_type = 0, payload is an error msg)
-                    let mut response = RemotePacket::new(0,vec![s!["Error"]]);
+            let resp = match pkt.cmd_type {
+                //64 is the beginning of the command space for ctrl_svc
+                64 => self.get_state().await.unwrap(),
+                68 => self.set_destination(pkt.payload[0].clone()).await.unwrap(),
+                69 => self.launch_pod().await.unwrap(),
+                99 => self.engage_brakes().await.unwrap(),
+                _ => RemotePacket::new(0, vec![s!("Invalid command")]),
+                //127 is the end of the command space for ctrl_svc
+            };
 
-                    match pkt {
-                        Some(packet) => response = self.command_handler(packet).await.unwrap(),
-                        None => {
-                            
-                            println!("No packet here?!")
-                        },
-                    }
-
-                    if let Err(e) = self.tx_auth.send(response).await{
-                        
-                        eprintln!("PodState->Auth failed: {}", e);
-
-                        
-                    }
-                }
+            if let Err(e) = self.tx_auth.send(resp).await {
+                eprintln!("ctrl->auth failed: {}", e);
+                break;
             }
         }
+
+        println!("ctrl_svc: service down");
+
+        Ok(())
     }
 
-    async fn command_handler(&mut self, pkt: RemotePacket) -> Result<RemotePacket, serde_json::Error> {
-        println!("Command type: {}", pkt.cmd_type);
-        let res: RemotePacket = match pkt.cmd_type {
-            //64 is the beginning of the command space for ctrl_svc
-            64 => self.get_state().await.unwrap(),
-            69 => self.launch_pod().await.unwrap(),
-            99 => self.engage_brakes().await.unwrap(),
-            _ => RemotePacket::new(0, vec![s!("Invalid command")]),
-            //127 is the end of the command space for ctrl_svc
-        };
-        Ok(res)
-    }
-
-    async fn get_state(&mut self) -> Result<RemotePacket, serde_json::Error> {
-        let pod_status_json = serde_json::to_string(&*self.pod_state.lock().await).unwrap();
-        Ok(RemotePacket::new(65, vec![pod_status_json]))
+    async fn get_state(&mut self) -> Result<RemotePacket, ()> {
+        if let Ok(pod_status_json) = serde_json::to_string(&*self.pod_state.lock().await) {
+            Ok(RemotePacket::new(65, vec![pod_status_json]))
+        } else {
+            Ok(RemotePacket::new(0, vec![s!("Podstate unavailable")]))
+        }
     }
     
-    async fn launch_pod(&mut self) -> Result<RemotePacket, serde_json::Error> {
+    async fn launch_pod(&mut self) -> Result<RemotePacket, ()> {
         match *self.pod_state.lock().await {
             PodState::Locked => {
                 // send launch command to pod_conn_svc
@@ -89,7 +78,7 @@ impl CtrlSvc {
         }
     }
 
-    async fn engage_brakes(&mut self) -> Result<RemotePacket, serde_json::Error> {
+    async fn engage_brakes(&mut self) -> Result<RemotePacket, ()> {
         match *self.pod_state.lock().await {
             PodState::Moving => {
                 // send braking command to pod_conn_svc
@@ -98,6 +87,33 @@ impl CtrlSvc {
                 Ok(RemotePacket::new(96, vec![s!("Pod brakes engaged")]))
             },
             _ => return Ok(RemotePacket::new(0, vec![s!("PodState not moving, cannot brake")]))
+        }
+    }
+
+    async fn set_destination(&mut self, req: String) -> Result<RemotePacket, ()> {
+        if let Ok(params) = serde_json::from_str::<LaunchParams>(&req) {
+            match params.distance {
+                None => return Ok(RemotePacket::new(0, vec![s!("Invalid distance")])),
+                Some(d) => {
+                    if DIST_RANGE.contains(&d) {
+                        match params.max_speed {
+                            None => return Ok(RemotePacket::new(0, vec![s!("Invalid max speed")])),
+                            Some(s) => {
+                                if SPEED_RANGE.contains(&s) {
+                                    *self.launch_params.lock().await = params;
+                                    return Ok(RemotePacket::new(65, vec![s!("Launch parameters set")]))                
+                                } else {
+                                    return Ok(RemotePacket::new(0, vec![s!("Max speed out of valid range")]))
+                                }
+                            }
+                        }
+                    } else {
+                        return Ok(RemotePacket::new(0, vec![s!("Distance out of valid range")]))
+                    }
+                }
+            }
+        } else {
+            return Ok(RemotePacket::new(0, vec![s!("Launch parameters not set, malformed")]))
         }
     }
 }

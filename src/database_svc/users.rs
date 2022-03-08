@@ -91,7 +91,7 @@ pub fn add_user(conn: &Connection, user: User) -> bool {
         "INSERT INTO users (name, hash, ugroup) VALUES (?1, ?2, ?3)",
         params![user.name, user.hash, user.ugroup]) {
         Ok(_) => return true,
-        Err(e) => return false
+        Err(_) => return false
     }
 }
 

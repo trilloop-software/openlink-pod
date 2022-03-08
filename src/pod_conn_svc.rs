@@ -1,6 +1,6 @@
 use super::pod_packet::*;
 use super::pod_packet_payload::*;
-use shared::device::*;
+use shared::{device::*, launch::*};
 
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
@@ -19,6 +19,7 @@ pub struct PodConnSvc {
     pub conn_list: Vec<TcpStream>,
     
     pub device_list: Arc<Mutex<Vec<Device>>>,
+    pub launch_params: Arc<Mutex<LaunchParams>>,
     pub pod_state: Arc<Mutex<PodState>>,
 
     pub rx_ctrl: Receiver<u8>,
@@ -206,7 +207,9 @@ impl PodConnSvc {
 
                                 //the command code specified in the packet from link_svc
                                 //is the command code that the device will recognize
-                                self.send_cmd(index, payload.target_cmd_code, PodPacketPayload::new());
+                                if let Err(()) = self.send_cmd(index, payload.target_cmd_code, PodPacketPayload::new()).await {
+                                    println!("pod_conn_svc: send_cmd failed");
+                                }
 
                             }
 
@@ -255,7 +258,9 @@ impl PodConnSvc {
         let size = self.device_list.lock().await.len();
 
         for index in 0..size{
-            self.send_cmd(index,2, PodPacketPayload::new()).await;
+            if let Err(()) = self.send_cmd(index,2, PodPacketPayload::new()).await {
+                println!("pod_conn_svc: send_cmd failed");
+            }
         }
 
         Ok(())

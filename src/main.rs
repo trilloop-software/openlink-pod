@@ -16,7 +16,7 @@ mod ctrl_svc;
 mod database_svc;
 mod user;
 
-use shared::{remote_conn_packet::*, device::*};
+use shared::{remote_conn_packet::*, device::*, launch::LaunchParams};
 use pod_packet::*;
 
 #[tokio::main]
@@ -57,6 +57,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // shared memory
     let device_list: Vec<Device> = Vec::new();
     let device_list = Arc::new(Mutex::new(device_list));
+    let launch_params = Arc::new(Mutex::new(LaunchParams{ distance: None, max_speed: None }));
     let pod_state = Arc::new(Mutex::new(pod_conn_svc::PodState::Unlocked));
 
     // Create services with necessary control signals
@@ -81,7 +82,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         rx_remote: rx_remote_to_emerg,
     };
 
-    let ctrl_svc = ctrl_svc::CtrlSvc { 
+    let ctrl_svc = ctrl_svc::CtrlSvc {
+        launch_params: Arc::clone(&launch_params),
         pod_state: Arc::clone(&pod_state),
 
         rx_auth: rx_auth_to_ctrl, 
@@ -109,6 +111,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let pod_conn_svc = pod_conn_svc::PodConnSvc {
         conn_list: Vec::new(),
         device_list: Arc::clone(&device_list),
+        launch_params: Arc::clone(&launch_params),
         pod_state: Arc::clone(&pod_state),
         rx_ctrl: rx_ctrl_to_pod,
         tx_ctrl: tx_pod_to_ctrl,
