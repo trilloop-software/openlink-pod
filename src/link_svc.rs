@@ -113,14 +113,12 @@ impl LinkSvc {
         // if lock command was successful
         match self.rx_pod.recv().await.unwrap().cmd_type{
             0 =>{
-                println!("Lock failed");
-                Ok(s!["lock unsuccessful"])
+                // return new device_list
+                self.get_device_list().await
             }
             _=>{
                 // return new device_list
-                self.get_device_list().await;
-                //return success message
-                Ok(s!["lock successful"])
+                self.get_device_list().await
             }
 
         }

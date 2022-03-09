@@ -123,7 +123,7 @@ impl PodConnSvc {
 
                                         //once successful, send a response to link_svc
                                         pkt.payload = vec![0];
-                                        self.tx_link.send(pkt);
+                                        self.tx_link.send(pkt).await;
 
                                     },
                                     Err(()) => {
@@ -131,7 +131,7 @@ impl PodConnSvc {
                                         //if unsuccessful, send a response to link_svc
                                         pkt.payload = vec![0];
                                         pkt.cmd_type = 0;
-                                        self.tx_link.send(pkt);
+                                        self.tx_link.send(pkt).await;
     
                                     },
                                 };
@@ -174,14 +174,14 @@ impl PodConnSvc {
                                         println!("device connections closed successfully");
                                         //once successful, send a response to link_svc
                                         pkt.payload = vec![0];
-                                        self.tx_link.send(pkt);
+                                        self.tx_link.send(pkt).await;
                                     }
                                     Err(())=>{
                                         println!("error: could not close device connections");
                                         //if unsuccessful, send a response to link_svc
                                         pkt.payload = vec![0];
                                         pkt.cmd_type = 0;
-                                        self.tx_link.send(pkt);
+                                        self.tx_link.send(pkt).await;
                                     }
                                 };
                                 
@@ -190,7 +190,7 @@ impl PodConnSvc {
                                 //if unsuccessful, send a response to link_svc
                                 pkt.payload = vec![0];
                                 pkt.cmd_type = 0;
-                                self.tx_link.send(pkt);
+                                self.tx_link.send(pkt).await;
                             }
 
                         }
@@ -230,14 +230,14 @@ impl PodConnSvc {
                                 }
                                 //once successful, send a response to link_svc
                                 pkt.payload = vec![0];
-                                self.tx_link.send(pkt);
+                                self.tx_link.send(pkt).await;
 
                             }
                             else{
                                 //if unsuccessful, send a response to link_svc
                                 pkt.payload = vec![0];
                                 pkt.cmd_type = 0;
-                                self.tx_link.send(pkt);
+                                self.tx_link.send(pkt).await;
                             }
 
                         }
