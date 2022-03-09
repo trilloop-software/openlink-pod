@@ -25,7 +25,10 @@ pub struct AuthSvc {
     pub tx_ctrl: Sender<RemotePacket>,
 
     pub rx_data: Receiver<RemotePacket>,
-    pub tx_data: Sender<RemotePacket>
+    pub tx_data: Sender<RemotePacket>,
+
+    pub rx_tele: Receiver<RemotePacket>,
+    pub tx_tele: Sender<RemotePacket>,
 }
 
 impl AuthSvc {
@@ -66,7 +69,14 @@ impl AuthSvc {
                 },
                 128..=159 => {
                     // telemetry service command handling
-                    pkt
+                    if self.check_token(pkt.token.clone()) == 0 {
+                        RemotePacket::new(0, vec![s!("Not authorized")])
+                    } else {
+                        if let Err(e) = self.tx_tele.send(pkt).await {
+                            eprintln!("auth->tele failed: {}", e);
+                        }
+                        self.rx_tele.recv().await.unwrap()
+                    }
                 },
                 160..=195 => {
                     // database service command handling

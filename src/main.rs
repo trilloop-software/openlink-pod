@@ -14,6 +14,7 @@ mod emerg_svc;
 mod pod_conn_svc;
 mod ctrl_svc;
 mod database_svc;
+mod tele_svc;
 mod user;
 
 use shared::{remote_conn_packet::*, device::*, launch::LaunchParams};
@@ -54,6 +55,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let (tx_auth_to_data, rx_auth_to_data) = mpsc::channel::<RemotePacket>(32);
     let (tx_data_to_auth, rx_data_to_auth) = mpsc::channel::<RemotePacket>(32);
 
+    // auth-tele
+    let (tx_auth_to_tele, rx_auth_to_tele) = mpsc::channel::<RemotePacket>(32);
+    let (tx_tele_to_auth, rx_tele_to_auth) = mpsc::channel::<RemotePacket>(32);
+
     // shared memory
     let device_list: Vec<Device> = Vec::new();
     let device_list = Arc::new(Mutex::new(device_list));
@@ -73,6 +78,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         rx_data: rx_data_to_auth,
         tx_data: tx_auth_to_data,
+
+        rx_tele: rx_tele_to_auth,
+        tx_tele: tx_auth_to_tele,
     };
 
     let emerg_svc = emerg_svc::EmergSvc {
@@ -123,6 +131,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         //tx_tele: todo!(),
     };
 
+    let tele_svc = tele_svc::TelemetrySvc {
+        pod_state: Arc::clone(&pod_state),
+        tele_data: Vec::new(),
+        rx_auth: rx_auth_to_tele,
+        tx_auth: tx_tele_to_auth,
+    };
+
     let database_svc = database_svc::DatabaseSvc {
         rx_auth: rx_auth_to_data,
         tx_auth: tx_data_to_auth,
@@ -135,6 +150,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     spawn(emerg_svc.run());
     spawn(ctrl_svc.run());
     spawn(pod_conn_svc.run());
+    spawn(tele_svc.run());
     spawn(database_svc.run());
 
     loop {
