@@ -100,7 +100,7 @@ impl LinkSvc {
 
     /// Lock device_list to start TCP connections to embedded devices in pod_conn_svc
     /// Once locked, devices cannot be edited in "Configure" page until the pod is unlocked
-    async fn lock_pod(&self) -> Result<String, serde_json::Error> {
+    async fn lock_pod(&mut self) -> Result<String, serde_json::Error> {
         println!("link_svc: lock_devices command received");
 
         //send lock command to pod_conn_svc
@@ -111,13 +111,26 @@ impl LinkSvc {
         }
 
         // if lock command was successful
-        // return new device_list
-        self.get_device_list().await
+        match self.rx_pod.recv().await.unwrap().cmd_type{
+            0 =>{
+                println!("Lock failed");
+                Ok(s!["lock unsuccessful"])
+            }
+            _=>{
+                // return new device_list
+                self.get_device_list().await;
+                //return success message
+                Ok(s!["lock successful"])
+            }
+
+        }
+
+
     }
 
     // Unlock device_list to stop TCP connections to embedded devices in pod_conn_svc
     // Once unlocked, devices can be re-configured in the "Configure page" until pod is locked again
-    async fn unlock_pod(&self)-> Result<String, serde_json::Error>{
+    async fn unlock_pod(&mut self)-> Result<String, serde_json::Error>{
         println!("link_svc: unlock_devices command received");
 
         //send unlock command to pod_conn_svc
@@ -127,8 +140,18 @@ impl LinkSvc {
             println!("link->pod failed: {}", e);
         }
 
-        //return success message
-        Ok(s!["unlock successful"])
+        // if lock command was successful
+        match self.rx_pod.recv().await.unwrap().cmd_type{
+            0 =>{
+                println!("Unlock failed");
+                Ok(s!["unlock unsuccessful"])
+            }
+            _=>{
+                //return success message
+                Ok(s!["unlock successful"])
+            }
+
+        }
     }
 
     /// Find device received from client in device list and remove from vector

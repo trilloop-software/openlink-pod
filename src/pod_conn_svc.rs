@@ -71,7 +71,7 @@ impl PodConnSvc {
                 //handle commands from link_svc
                 packet = self.rx_link.recv() => {
 
-                    let pkt = packet.unwrap().clone();
+                    let mut pkt = packet.unwrap().clone();
                     let link_cmd = pkt.cmd_type;
                     let payload = decode_payload(pkt.payload);
 
@@ -121,8 +121,17 @@ impl PodConnSvc {
                                             };
                                         }
 
+                                        //once successful, send a response to link_svc
+                                        pkt.payload = vec![0];
+                                        self.tx_link.send(pkt);
+
                                     },
                                     Err(()) => {
+
+                                        //if unsuccessful, send a response to link_svc
+                                        pkt.payload = vec![0];
+                                        pkt.cmd_type = 0;
+                                        self.tx_link.send(pkt);
     
                                     },
                                 };
@@ -144,14 +153,12 @@ impl PodConnSvc {
                                 PodState::Unlocked => {
                                     // locking command unnecessary, return fail message
                                     eprintln!("Pod already unlocked");
-                                    //TODO: return an error message to link_svc
 
                                 }
                                 _ => {
                                     // unlocking command denied when pod is Moving or Braking
                                     //return fail message
                                     eprintln!("Pod may only be Unlocked when in Locked state");
-                                    //TODO: return an error message to link_svc
 
                                 }
                             }
@@ -165,17 +172,29 @@ impl PodConnSvc {
                                 match self.clear_conn_list().await{
                                     Ok(()) =>{
                                         println!("device connections closed successfully");
+                                        //once successful, send a response to link_svc
+                                        pkt.payload = vec![0];
+                                        self.tx_link.send(pkt);
                                     }
                                     Err(())=>{
                                         println!("error: could not close device connections");
+                                        //if unsuccessful, send a response to link_svc
+                                        pkt.payload = vec![0];
+                                        pkt.cmd_type = 0;
+                                        self.tx_link.send(pkt);
                                     }
                                 };
                                 
-
+                            }
+                            else{
+                                //if unsuccessful, send a response to link_svc
+                                pkt.payload = vec![0];
+                                pkt.cmd_type = 0;
+                                self.tx_link.send(pkt);
                             }
 
                         }
-                        //send cmd to device command
+                        //send cmd to device 
                         3=>{
                             let index = self.device_list.lock().await.iter().position(|d| d.id == payload.target_id).unwrap();
 
@@ -189,14 +208,13 @@ impl PodConnSvc {
                                 PodState::Unlocked => {
                                     // return fail message
                                     eprintln!("Please lock the pod first");
-                                    //TODO: return an error message to link_svc
 
                                 }
                                 _ => {
  
                                     //return fail message
                                     eprintln!("Failed to send command to device");
-                                    //TODO: return an error message to link_svc
+
 
                                 }
                             }
@@ -210,7 +228,16 @@ impl PodConnSvc {
                                 if let Err(()) = self.send_cmd(index, payload.target_cmd_code, PodPacketPayload::new()).await {
                                     println!("pod_conn_svc: send_cmd failed");
                                 }
+                                //once successful, send a response to link_svc
+                                pkt.payload = vec![0];
+                                self.tx_link.send(pkt);
 
+                            }
+                            else{
+                                //if unsuccessful, send a response to link_svc
+                                pkt.payload = vec![0];
+                                pkt.cmd_type = 0;
+                                self.tx_link.send(pkt);
                             }
 
                         }
