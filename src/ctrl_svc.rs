@@ -5,6 +5,8 @@ use std::{sync::Arc, ops::Range};
 /* POD STATE COMMANDS
 64 - Get state
 Returns PodState
+68 - Set Destination
+Sets launch_params
 69 - Launch
 Launches pod
 99 - Brakes
@@ -31,6 +33,7 @@ pub struct CtrlSvc {
 }
 
 impl CtrlSvc {
+    /// Main service task for controls service
     pub async fn run(mut self) -> Result<()> {
         println!("ctrl_svc: service running");
 
@@ -58,6 +61,7 @@ impl CtrlSvc {
         Ok(())
     }
 
+    /// Return the current state of the pod to the remote client
     async fn get_state(&mut self) -> Result<RemotePacket, ()> {
         if let Ok(pod_status_json) = serde_json::to_string(&*self.pod_state.lock().await) {
             Ok(RemotePacket::new(65, vec![pod_status_json]))
@@ -66,6 +70,7 @@ impl CtrlSvc {
         }
     }
     
+    /// Launch the pod if in valid state
     async fn launch_pod(&mut self) -> Result<RemotePacket, ()> {
         match *self.pod_state.lock().await {
             PodState::Locked => {
@@ -78,6 +83,7 @@ impl CtrlSvc {
         }
     }
 
+    /// Engage brakes if in valid state
     async fn engage_brakes(&mut self) -> Result<RemotePacket, ()> {
         match *self.pod_state.lock().await {
             PodState::Moving => {
@@ -90,6 +96,7 @@ impl CtrlSvc {
         }
     }
 
+    /// Set launch_params to be used by pod_conn_svc
     async fn set_destination(&mut self, req: String) -> Result<RemotePacket, ()> {
         if let Ok(params) = serde_json::from_str::<LaunchParams>(&req) {
             match params.distance {

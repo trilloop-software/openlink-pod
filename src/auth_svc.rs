@@ -33,7 +33,7 @@ pub struct AuthSvc {
 
 impl AuthSvc {
     /// Main service task for auth service
-    /// Utilizing as command parser for now since all commands will require authentication in the future
+    /// Also serves as command parser since all commands require authentication
     pub async fn run(mut self) -> Result<()> {
         println!("auth_svc running");
 
@@ -47,7 +47,9 @@ impl AuthSvc {
                 },
                 32..=63 => {
                     // link service command handling
-                    if self.check_token(pkt.token.clone()) == 0 {
+                    // restrict to only admin and software team accounts
+                    let ugroup = self.check_token(pkt.token.clone());
+                    if ugroup == 0 || ugroup == 1 {
                         RemotePacket::new(0, vec![s!("Not authorized")])
                     } else {
                         if let Err(e) = self.tx_link.send(pkt).await {
@@ -57,8 +59,10 @@ impl AuthSvc {
                     }
                 },
                 64..=127 => {
-                    // pod state service command handling
-                    if self.check_token(pkt.token.clone()) == 0 {
+                    // control service command handling
+                    // restrict to only admin and mission control accounts
+                    let ugroup = self.check_token(pkt.token.clone());
+                    if ugroup == 0 || ugroup == 2 {
                         RemotePacket::new(0, vec![s!("Not authorized")])
                     } else {
                         if let Err(e) = self.tx_ctrl.send(pkt).await {
@@ -69,6 +73,7 @@ impl AuthSvc {
                 },
                 128..=159 => {
                     // telemetry service command handling
+                    // all authenticated users can access telemetry
                     if self.check_token(pkt.token.clone()) == 0 {
                         RemotePacket::new(0, vec![s!("Not authorized")])
                     } else {
@@ -80,7 +85,8 @@ impl AuthSvc {
                 },
                 160..=195 => {
                     // database service command handling
-                    if self.check_token(pkt.token.clone()) == 0 {
+                    // restrict to only admin accounts
+                    if self.check_token(pkt.token.clone()) != 255 {
                         RemotePacket::new(0, vec![s!("Not authorized")])
                     } else {
                         if let Err(e) = self.tx_data.send(pkt).await {
@@ -111,6 +117,7 @@ impl AuthSvc {
         Ok(())
     }
 
+    /// Handler for auth service defined ranges of cmd_type
     async fn auth_handler(&mut self, pkt: &RemotePacket) -> Result<RemotePacket> {
         let resp = match pkt.cmd_type {
             1 => self.login(&pkt).await,
@@ -120,6 +127,7 @@ impl AuthSvc {
         Ok(resp)
     }
 
+    /// Check for user token and return the usergroup
     fn check_token(&self, token: String) -> u8 {
         let validation = jsonwebtoken::Validation::new(jsonwebtoken::Algorithm::HS256);
 
@@ -129,6 +137,7 @@ impl AuthSvc {
         }
     }
 
+    /// Generate a token for the user with their usergroup
     fn generate_token(&self, ugroup: u8) -> String {
         let claims = Claims {
             exp: 10000000000,
@@ -141,6 +150,8 @@ impl AuthSvc {
         }
     }
 
+    /// Query data_svc to check for matching user,
+    /// authenticate with boringauth matching hashes of password
     async fn login(&mut self, pkt: &RemotePacket) -> RemotePacket {
         let credentials: LoginCredentials = serde_json::from_str(&pkt.payload[0].clone()).unwrap();
         let user = User::new(credentials.username.clone(), s!("pwd"), 0);
@@ -155,7 +166,7 @@ impl AuthSvc {
         match serde_json::from_str::<User>(&resp.payload[0]) {
             Ok(user) => {
                 if is_valid(&credentials.password, &user.hash) {
-                    RemotePacket::new_with_auth(1, vec![s!("Authenticated")], self.generate_token(user.ugroup))
+                    RemotePacket::new_with_auth(1, vec![s!("Authenticated"), s!(user.ugroup)], self.generate_token(user.ugroup))
                 } else {
                     if user.name == "" {
                         RemotePacket::new(0, vec![s!("User not found")])

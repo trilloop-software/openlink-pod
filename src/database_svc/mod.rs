@@ -21,6 +21,7 @@ pub struct DatabaseSvc {
 }
 
 impl DatabaseSvc {
+    /// Main service task for database service
     pub async fn run(mut self) -> Result<()> {
         println!("database_svc: service running");
 

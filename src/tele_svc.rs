@@ -20,6 +20,7 @@ pub struct TelemetrySvc {
 }
 
 impl TelemetrySvc {
+    /// Main service task for telemetry service
     pub async fn run(mut self) {
         println!("tele_svc: service running");
         self.init_fake_telemetry();
@@ -44,7 +45,8 @@ impl TelemetrySvc {
         }
     }
 
-    // TEMPORARY FUNCTION
+    /// TEMPORARY FUNCTION
+    /// Initializes the tele_data vector with fake measurements, with upper and lower bounds
     fn init_fake_telemetry(&mut self) {
         self.tele_data.push(TelemetryData::new(s!("Accelerometer"), 0.0, 120.0, 0.0));
         self.tele_data.push(TelemetryData::new(s!("Brake Temperature"), 0.0, 70.0, 30.0));
@@ -52,7 +54,8 @@ impl TelemetrySvc {
         self.tele_data.push(TelemetryData::new(s!("Battery Current"), 0.0, 5.0, 0.0));
     }
 
-    // TEMPORARY FUNCTION
+    /// TEMPORARY FUNCTION
+    /// Generates current values of telemetry data from upper and lower bounds
     fn generate_fake_telemetry(&mut self) {
         let mut rng = rand::thread_rng();
         for el in &mut self.tele_data {
@@ -60,6 +63,8 @@ impl TelemetrySvc {
         }
     }
 
+    /// Repeating function to ask pod_conn_svc for telemetry
+    /// Currently generates fake telemetry
     async fn get_telemetry(&mut self) {
         let gather = match *self.pod_state.lock().await {
             PodState::Unlocked => false,
@@ -71,7 +76,7 @@ impl TelemetrySvc {
         }
     }
 
-    // report both telemetry data and pod_state
+    /// Report both telemetry data and pod_state
     async fn report_telemetry(&mut self) -> RemotePacket {
         let pod_state = serde_json::to_string(&*self.pod_state.lock().await).unwrap();
         let telemetry = serde_json::to_string(&self.tele_data).unwrap();

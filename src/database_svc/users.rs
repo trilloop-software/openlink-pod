@@ -3,6 +3,7 @@ use rusqlite::{Connection, params};
 use shared::user::*;
 use super::super::{RemotePacket, user::*};
 
+/// Handler for all user-related database cmd_types
 pub fn handler(conn: &Connection, mut pkt: RemotePacket) -> RemotePacket {
     match pkt.cmd_type {
         160 => {
@@ -85,7 +86,8 @@ pub fn handler(conn: &Connection, mut pkt: RemotePacket) -> RemotePacket {
     }
 }
 
-// cmd_type = 160
+/// Add user to embedded database with specified username, password, usergroup,
+/// cmd_type = 160
 pub fn add_user(conn: &Connection, user: User) -> bool {
     match conn.execute(
         "INSERT INTO users (name, hash, ugroup) VALUES (?1, ?2, ?3)",
@@ -95,7 +97,8 @@ pub fn add_user(conn: &Connection, user: User) -> bool {
     }
 }
 
-// cmd_type = 161
+/// Get user from database for login purposes (includes hashed password),
+/// cmd_type = 161
 pub fn get_user(conn: &Connection, name: String) -> User {
     match conn.query_row(
         "SELECT * FROM users WHERE name = (?1)",
@@ -110,7 +113,8 @@ pub fn get_user(conn: &Connection, name: String) -> User {
                 };
 }
 
-// cmd_type = 162
+/// Grab a list of users with their usergroups (ignoring hashed passwords for security reasons)
+/// cmd_type = 162
 pub fn get_user_list(conn: &Connection) -> Vec<UserSecure> {
     let mut stmt = conn.prepare("SELECT name, ugroup FROM users").unwrap();
     let mut rows = stmt.query([]).unwrap();
@@ -124,7 +128,8 @@ pub fn get_user_list(conn: &Connection) -> Vec<UserSecure> {
     users
 }
 
-// cmd_type = 163
+/// Remove user with name, return boolean of result
+/// cmd_type = 163
 pub fn remove_user(conn: &Connection, name: String) -> bool {
     match conn.execute(
         "DELETE FROM users WHERE name = (?1)", 
@@ -134,7 +139,8 @@ pub fn remove_user(conn: &Connection, name: String) -> bool {
     }
 }
 
-// cmd_type = 164
+/// Update user with new usergroup
+/// cmd_type = 164
 pub fn update_user_group(conn: &Connection, user: UserSecure) -> bool {
     match conn.execute(
         "UPDATE users SET ugroup=(?2) WHERE name=(?1)",
@@ -144,7 +150,8 @@ pub fn update_user_group(conn: &Connection, user: UserSecure) -> bool {
     }
 }
 
-// cmd_type = 165
+/// Update user with new password (hashed)
+/// cmd_type = 165
 pub fn update_user_password(conn: &Connection, user: User) -> bool {
     match conn.execute(
         "UPDATE users SET hash=(?2) WHERE name=(?1)",
