@@ -75,26 +75,34 @@ impl CtrlSvc {
     
     /// Launch the pod if in valid state
     async fn launch_pod(&mut self) -> Result<RemotePacket, ()> {
-        match *self.pod_state.lock().await {
-            PodState::Locked => {
-                // send launch command to pod_conn_svc
-                if let Err(e) = self.tx_pod.send(PodPacket::new(254,encode_payload(PodPacketPayload::new()))).await {
-                    eprintln!("ctrl->pod failed: {}", e);
-                }
 
-                //receive the ACK from pod_conn_svc
-                self.rx_pod.recv().await;
+        let launch = match *self.pod_state.lock().await {
+            PodState::Locked => true,
+            _ => false
+        };
 
-                // Once OK() is received, change state to PodState::Moving
-                *self.pod_state.lock().await = PodState::Moving;
-                println!("Pod launched");
-                // return the appropriate ACK packet wrapped in OK()
-                Ok(RemotePacket::new(69, vec![s!("Pod launched")]))
-                
+        if launch {
+            // send launch command to pod_conn_svc
+            if let Err(e) = self.tx_pod.send(PodPacket::new(254,encode_payload(PodPacketPayload::new()))).await {
+                eprintln!("ctrl->pod failed: {}", e);
+            }
 
-            },
-            _ => return Ok(RemotePacket::new(0, vec![s!("PodState not locked, cannot launch")])),
+            //receive the ACK from pod_conn_svc
+            self.rx_pod.recv().await;
+
+            println!("ctrl: received ACK from pod_conn");
+
+            // Once OK() is received, change state to PodState::Moving
+            *self.pod_state.lock().await = PodState::Moving;
+
+            println!("Pod launched");
+            // return the appropriate ACK packet wrapped in OK()
+            return Ok(RemotePacket::new(69, vec![s!("Pod launched")]))
         }
+        else{
+            return Ok(RemotePacket::new(0, vec![s!("PodState not locked, cannot launch")]))
+        }
+
     }
 
     /// Engage brakes if in valid state
