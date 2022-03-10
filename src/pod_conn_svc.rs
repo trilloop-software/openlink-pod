@@ -388,7 +388,9 @@ impl PodConnSvc {
                         254 =>{
                             println!("pod_conn: Launching Sequence successful");
                             //send ACK back to ctrl_svc
-                            self.tx_ctrl.send(PodPacket::new(254,encode_payload(PodPacketPayload::new()))).await;
+                            if let Err(e) = self.tx_ctrl.send(PodPacket::new(254,encode_payload(PodPacketPayload::new()))).await {
+                                eprintln!("pod->ctrl failed: {}", e);
+                            }
                         },
                         //error response 
                         0 =>{

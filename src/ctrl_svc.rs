@@ -78,10 +78,12 @@ impl CtrlSvc {
         match *self.pod_state.lock().await {
             PodState::Locked => {
                 // send launch command to pod_conn_svc
-                self.tx_pod.send(PodPacket::new(254,encode_payload(PodPacketPayload::new()))).await;
+                if let Err(e) = self.tx_pod.send(PodPacket::new(254,encode_payload(PodPacketPayload::new()))).await {
+                    eprintln!("ctrl->pod failed: {}", e);
+                }
 
                 //receive the ACK from pod_conn_svc
-                //self.rx_pod.recv().await;
+                self.rx_pod.recv().await;
 
                 // Once OK() is received, change state to PodState::Moving
                 *self.pod_state.lock().await = PodState::Moving;
