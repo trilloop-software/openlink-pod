@@ -22,7 +22,7 @@ const DIST_RANGE: Range<f32> = 0.0..250.0;
 const SPEED_RANGE: Range<f32> = 0.0..111.0;
 
 pub struct CtrlSvc { 
-    pub launch_params: Arc<Mutex<LaunchParams>>,
+    pub launch_params: LaunchParams,
 
     //State things
     pub pod_state: Arc<Mutex<PodState>>,
@@ -32,7 +32,9 @@ pub struct CtrlSvc {
     pub tx_auth : Sender<RemotePacket>,
 
     pub rx_pod : Receiver<PodPacket>,
-    pub tx_pod: Sender<PodPacket>
+    pub tx_pod: Sender<PodPacket>,
+
+    pub tx_trip: Sender<LaunchParams>,
 }
 
 impl CtrlSvc {
@@ -95,6 +97,10 @@ impl CtrlSvc {
             // Once OK() is received, change state to PodState::Moving
             *self.pod_state.lock().await = PodState::Moving;
 
+            if let Err(e) = self.tx_trip.send(self.launch_params.clone()).await {
+                eprintln!("ctrl->trip failed: {}", e);
+            }
+
             println!("Pod launched");
             // return the appropriate ACK packet wrapped in OK()
             return Ok(RemotePacket::new(69, vec![s!("Pod launched")]))
@@ -138,7 +144,7 @@ impl CtrlSvc {
                             None => return Ok(RemotePacket::new(0, vec![s!("Invalid max speed")])),
                             Some(s) => {
                                 if SPEED_RANGE.contains(&s) {
-                                    *self.launch_params.lock().await = params;
+                                    self.launch_params = params;
                                     return Ok(RemotePacket::new(65, vec![s!("Launch parameters set")]))                
                                 } else {
                                     return Ok(RemotePacket::new(0, vec![s!("Max speed out of valid range")]))

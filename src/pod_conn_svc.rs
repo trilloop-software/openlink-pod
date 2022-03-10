@@ -1,6 +1,6 @@
 use super::pod_packet::*;
 use super::pod_packet_payload::*;
-use shared::{device::*, launch::*};
+use shared::device::*;
 
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
@@ -19,7 +19,6 @@ pub struct PodConnSvc {
     pub conn_list: Vec<TcpStream>,
     
     pub device_list: Arc<Mutex<Vec<Device>>>,
-    pub launch_params: Arc<Mutex<LaunchParams>>,
     pub pod_state: Arc<Mutex<PodState>>,
 
     pub rx_ctrl: Receiver<PodPacket>,
@@ -30,6 +29,7 @@ pub struct PodConnSvc {
     pub tx_link: Sender<PodPacket>,
     //pub rx_tele: Receiver<i32>,
     //pub tx_tele: Sender<i32>,
+    pub rx_trip: Receiver<u8>,
 }
 
 /// pod_conn_svc opens and manages tcp streams to all embedded devices
@@ -79,41 +79,14 @@ impl PodConnSvc {
                     match link_cmd{
                         //cmd to engage brakes
                         255=>{
-                            //send the braking command
-                            //to each device
-                            let num = self.device_list.lock().await.len();
-
-                            for index in 0..num{
-                                let res = match self.send_cmd(index,255, PodPacketPayload::new()).await{
-                                    Ok(()) => 1,
-                                    Err(()) => 0,
-                                };
-                                if let Err(e) = self.tx_ctrl.send(PodPacket::new(255,Vec::<u8>::new())).await {
-                                    eprintln!("pod->ctrl failed: {}", e);
-                                };
-                            }
+                            self.engage_brakes().await;
 
                             //send ACK back to ctrl_svc
                             self.tx_ctrl.send(PodPacket::new(254,encode_payload(PodPacketPayload::new()))).await;
                         }
                         //cmd to launch pod
                         254=>{
-                            //send the launch command
-                            //to each device
-                            let num = self.device_list.lock().await.len();
-
-                            for index in 0..num{
-                                let res = match self.send_cmd(index,254, PodPacketPayload::new()).await{
-                                    Ok(()) => 1,
-                                    Err(()) => 0,
-                                };
-                                if let Err(e) = self.tx_ctrl.send(PodPacket::new(255,Vec::<u8>::new())).await {
-                                    eprintln!("pod->ctrl failed: {}", e);
-                                };
-                            }
-
-
-
+                            self.launch().await;
                         }
                         //cmd to activate device specific command
                         _=>{
@@ -302,6 +275,9 @@ impl PodConnSvc {
                 /*tele_cmd = self.rx_tele.recv() => {
                     self.get_telemetry()
                 }*/
+                _ = self.rx_trip.recv() => {
+                    self.engage_brakes().await;
+                }
             }
         }
     }
@@ -346,6 +322,38 @@ impl PodConnSvc {
         }
 
         Ok(())
+    }
+    
+    async fn engage_brakes(&mut self) {
+        //send the braking command
+        //to each device
+        let num = self.device_list.lock().await.len();
+
+        for index in 0..num{
+            let res = match self.send_cmd(index,255, PodPacketPayload::new()).await{
+                Ok(()) => 1,
+                Err(()) => 0,
+            };
+            if let Err(e) = self.tx_ctrl.send(PodPacket::new(255,Vec::<u8>::new())).await {
+                eprintln!("pod->ctrl failed: {}", e);
+            };
+        }
+    }
+
+    async fn launch(&mut self) {
+        //send the launch command
+        //to each device
+        let num = self.device_list.lock().await.len();
+
+        for index in 0..num{
+            let res = match self.send_cmd(index,254, PodPacketPayload::new()).await{
+                Ok(()) => 1,
+                Err(()) => 0,
+            };
+            if let Err(e) = self.tx_ctrl.send(PodPacket::new(255,Vec::<u8>::new())).await {
+                eprintln!("pod->ctrl failed: {}", e);
+            };
+        }
     }
 
     async fn send_cmd(&mut self, index:usize, cmd: u8, payload: PodPacketPayload)-> Result<(), ()> {

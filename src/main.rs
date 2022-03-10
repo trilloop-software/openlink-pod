@@ -15,6 +15,7 @@ mod pod_conn_svc;
 mod ctrl_svc;
 mod database_svc;
 mod tele_svc;
+mod trip_svc;
 mod user;
 
 use shared::{remote_conn_packet::*, device::*, launch::LaunchParams};
@@ -59,10 +60,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let (tx_auth_to_tele, rx_auth_to_tele) = mpsc::channel::<RemotePacket>(32);
     let (tx_tele_to_auth, rx_tele_to_auth) = mpsc::channel::<RemotePacket>(32);
 
+    // ctrl-trip
+    let (tx_ctrl_to_trip, rx_ctrl_to_trip) = mpsc::channel::<LaunchParams>(32);
+
+    // trip-pod
+    let (tx_trip_to_pod, rx_trip_to_pod) = mpsc::channel::<u8>(32);
+
     // shared memory
     let device_list: Vec<Device> = Vec::new();
     let device_list = Arc::new(Mutex::new(device_list));
-    let launch_params = Arc::new(Mutex::new(LaunchParams{ distance: None, max_speed: None }));
+    let launch_params = LaunchParams{ distance: None, max_speed: None };
     let pod_state = Arc::new(Mutex::new(pod_conn_svc::PodState::Unlocked));
 
     // Create services with necessary control signals
@@ -91,14 +98,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     };
 
     let ctrl_svc = ctrl_svc::CtrlSvc {
-        launch_params: Arc::clone(&launch_params),
+        launch_params: launch_params,
         pod_state: Arc::clone(&pod_state),
 
         rx_auth: rx_auth_to_ctrl, 
         tx_auth: tx_ctrl_to_auth,
 
         rx_pod: rx_pod_to_ctrl,
-        tx_pod: tx_ctrl_to_pod
+        tx_pod: tx_ctrl_to_pod,
+
+        tx_trip: tx_ctrl_to_trip,
     };
 
     let link_svc = link_svc::LinkSvc { 
@@ -119,7 +128,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let pod_conn_svc = pod_conn_svc::PodConnSvc {
         conn_list: Vec::new(),
         device_list: Arc::clone(&device_list),
-        launch_params: Arc::clone(&launch_params),
         pod_state: Arc::clone(&pod_state),
         rx_ctrl: rx_ctrl_to_pod,
         tx_ctrl: tx_pod_to_ctrl,
@@ -129,6 +137,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         tx_link: tx_pod_to_link,
         //rx_tele: todo!(),
         //tx_tele: todo!(),
+        rx_trip: rx_trip_to_pod,
     };
 
     let tele_svc = tele_svc::TelemetrySvc {
@@ -143,6 +152,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         tx_auth: tx_data_to_auth,
     };
 
+    let trip_svc = trip_svc::TripSvc {
+        pod_state: Arc::clone(&pod_state),
+        rx_ctrl: rx_ctrl_to_trip,
+        tx_pod: tx_trip_to_pod,
+    };
+
     // Spawn all services as tasks
     spawn(auth_svc.run());
     spawn(link_svc.run());
@@ -152,6 +167,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     spawn(pod_conn_svc.run());
     spawn(tele_svc.run());
     spawn(database_svc.run());
+    spawn(trip_svc.run());
 
     loop {
 
