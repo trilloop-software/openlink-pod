@@ -98,8 +98,7 @@ impl CtrlSvc {
             println!("Pod launched");
             // return the appropriate ACK packet wrapped in OK()
             return Ok(RemotePacket::new(69, vec![s!("Pod launched")]))
-        }
-        else{
+        } else {
             return Ok(RemotePacket::new(0, vec![s!("PodState not locked, cannot launch")]))
         }
 
@@ -107,14 +106,24 @@ impl CtrlSvc {
 
     /// Engage brakes if in valid state
     async fn engage_brakes(&mut self) -> Result<RemotePacket, ()> {
-        match *self.pod_state.lock().await {
-            PodState::Moving => {
-                // send braking command to pod_conn_svc
-                // wrap Ok() in await of recv channel from pod_conn_svc
-                // change state to PodState::Braking in pod_conn_svc or here?
-                Ok(RemotePacket::new(96, vec![s!("Pod brakes engaged")]))
-            },
-            _ => return Ok(RemotePacket::new(0, vec![s!("PodState not moving, cannot brake")]))
+        let moving = match *self.pod_state.lock().await {
+            PodState::Moving => true,
+            _ => false
+        };
+
+        if moving {
+            if let Err(e) = self.tx_pod.send(PodPacket::new(255, encode_payload(PodPacketPayload::new()))).await {
+                eprintln!("ctrl->pod failed: {}", e);
+            }
+
+            self.rx_pod.recv().await;
+
+            *self.pod_state.lock().await = PodState::Braking;
+            println!("Pod braking");
+
+            return Ok(RemotePacket::new(96, vec![s!("Pod brakes engaged")]))
+        } else {
+            return Ok(RemotePacket::new(0, vec![s!("PodState not moving, cannot brake")]))
         }
     }
 
