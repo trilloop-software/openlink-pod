@@ -14,6 +14,9 @@ Payload should be a bool to engage/disengage
 */
 
 use shared::{launch::*, remote_conn_packet::*};
+use crate::pod_packet::PodPacket;
+use crate::pod_packet_payload::*;
+
 use super::pod_conn_svc::PodState;
 const DIST_RANGE: Range<f32> = 0.0..250.0;
 const SPEED_RANGE: Range<f32> = 0.0..111.0;
@@ -28,8 +31,8 @@ pub struct CtrlSvc {
     pub rx_auth : Receiver<RemotePacket>,
     pub tx_auth : Sender<RemotePacket>,
 
-    pub rx_pod : Receiver<u8>,
-    pub tx_pod: Sender<u8>
+    pub rx_pod : Receiver<PodPacket>,
+    pub tx_pod: Sender<PodPacket>
 }
 
 impl CtrlSvc {
@@ -75,9 +78,18 @@ impl CtrlSvc {
         match *self.pod_state.lock().await {
             PodState::Locked => {
                 // send launch command to pod_conn_svc
-                // wrap Ok() in await of recv channel from pod_conn_svc
-                // change state to PodState::Moving in pod_conn_svc or here?
+                self.tx_pod.send(PodPacket::new(254,encode_payload(PodPacketPayload::new()))).await;
+
+                //receive the ACK from pod_conn_svc
+                //self.rx_pod.recv().await;
+
+                // Once OK() is received, change state to PodState::Moving
+                *self.pod_state.lock().await = PodState::Moving;
+                println!("Pod launched");
+                // return the appropriate ACK packet wrapped in OK()
                 Ok(RemotePacket::new(69, vec![s!("Pod launched")]))
+                
+
             },
             _ => return Ok(RemotePacket::new(0, vec![s!("PodState not locked, cannot launch")])),
         }

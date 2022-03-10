@@ -40,8 +40,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let (tx_remote_to_emerg, rx_remote_to_emerg) = mpsc::channel::<u8>(32);
 
     // ctrl-pod
-    let (tx_ctrl_to_pod, rx_ctrl_to_pod) = mpsc::channel::<u8>(32);
-    let (tx_pod_to_ctrl, rx_pod_to_ctrl) = mpsc::channel::<u8>(32);
+    let (tx_ctrl_to_pod, rx_ctrl_to_pod) = mpsc::channel::<PodPacket>(32);
+    let (tx_pod_to_ctrl, rx_pod_to_ctrl) = mpsc::channel::<PodPacket>(32);
 
     // emerg-pod
     let (tx_pod_to_emerg, rx_pod_to_emerg) = mpsc::channel::<u8>(32);
