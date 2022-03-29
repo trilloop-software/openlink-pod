@@ -1,9 +1,12 @@
 use anyhow::Result;
 use std::sync::Arc;
-use tokio::{sync::{mpsc::Receiver, mpsc::Sender, Mutex}, time::{sleep, Duration}};
+use tokio::{
+    sync::{mpsc::Receiver, mpsc::Sender, Mutex},
+    time::{sleep, Duration},
+};
 
-use shared::launch::*;
 use super::pod_conn_svc::PodState;
+use shared::launch::*;
 
 pub struct TripSvc {
     pub pod_state: Arc<Mutex<PodState>>,
@@ -24,7 +27,7 @@ impl TripSvc {
         // change state to locked
         while let Some(params) = self.rx_ctrl.recv().await {
             let time = (params.distance.unwrap() / (params.max_speed.unwrap() / 3.6)) / 2.0;
-            
+
             sleep(Duration::from_secs_f32(time)).await;
             *self.pod_state.lock().await = PodState::Braking;
             if let Err(e) = self.tx_pod.send(255).await {

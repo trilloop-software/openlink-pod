@@ -1,11 +1,11 @@
 use boringauth::pass::derive_password;
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct User {
     pub name: String,
     pub hash: String,
-    pub ugroup: u8
+    pub ugroup: u8,
 }
 // ugroup = permissions
 // 0 -> no permissions
@@ -19,18 +19,13 @@ impl User {
             name: name.to_lowercase(),
             hash: match derive_password(&pwd) {
                 Ok(hash) => hash,
-                Err(_) => s!("")
+                Err(_) => s!(""),
             },
-            ugroup
+            ugroup,
         }
     }
 
     pub fn from_sql(name: String, hash: String, ugroup: u8) -> Self {
-        Self {
-            name,
-            hash,
-            ugroup
-        }
+        Self { name, hash, ugroup }
     }
 }
-

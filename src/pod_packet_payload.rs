@@ -1,11 +1,10 @@
-use serde::{Serialize, Deserialize};
-use bincode::{serialize, deserialize};
+use bincode::{deserialize, serialize};
+use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize)]
 
 //template used in discovery packets
 pub struct PodPacketPayload {
-
     pub target_id: String,
     pub target_cmd_code: u8,
     pub field_names: Vec<String>,
@@ -25,11 +24,9 @@ impl PodPacketPayload {
             command_codes: Vec::new(),
         }
     }
-    
 }
 
 pub fn decode_payload(pkt: Vec<u8>) -> PodPacketPayload {
-
     deserialize(&pkt[..]).unwrap()
 }
 

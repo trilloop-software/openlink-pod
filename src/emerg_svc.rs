@@ -1,14 +1,12 @@
-use anyhow::{Result};
-use tokio::{sync::{mpsc::Receiver, mpsc::Sender}};
+use anyhow::Result;
+use tokio::sync::{mpsc::Receiver, mpsc::Sender};
 
-pub struct EmergSvc{
-    pub rx_remote : Receiver<u8>,
+pub struct EmergSvc {
+    pub rx_remote: Receiver<u8>,
 
-    pub rx_pod : Receiver<u8>,
-    pub tx_pod : Sender<u8>
-
-    //pub rx_tele : Receiver<Packet>,
-    //pub tx_tele : Sender<Packet>
+    pub rx_pod: Receiver<u8>,
+    pub tx_pod: Sender<u8>, //pub rx_tele : Receiver<Packet>,
+                            //pub tx_tele : Sender<Packet>
 }
 
 impl EmergSvc {
@@ -31,7 +29,7 @@ impl EmergSvc {
                             }
                         },
                         Err(e) => {
-                            
+
                             eprintln!("emerg->pod failed: {}", e)
                         }
                     }

@@ -1,9 +1,13 @@
 use rand::Rng;
 use std::sync::Arc;
-use tokio::{select, sync::{mpsc::Receiver, mpsc::Sender, Mutex}, time::{self, Duration}};
+use tokio::{
+    select,
+    sync::{mpsc::Receiver, mpsc::Sender, Mutex},
+    time::{self, Duration},
+};
 
-use shared::{remote_conn_packet::*, telemetry::*};
 use super::pod_conn_svc::PodState;
+use shared::{remote_conn_packet::*, telemetry::*};
 
 pub struct TelemetrySvc {
     pub pod_state: Arc<Mutex<PodState>>,
@@ -48,10 +52,18 @@ impl TelemetrySvc {
     /// TEMPORARY FUNCTION
     /// Initializes the tele_data vector with fake measurements, with upper and lower bounds
     fn init_fake_telemetry(&mut self) {
-        self.tele_data.push(TelemetryData::new(s!("Accelerometer"), 0.0, 120.0, 0.0));
-        self.tele_data.push(TelemetryData::new(s!("Brake Temperature"), 0.0, 70.0, 30.0));
-        self.tele_data.push(TelemetryData::new(s!("Battery Temperature"), 0.0, 50.0, 25.0));
-        self.tele_data.push(TelemetryData::new(s!("Battery Current"), 0.0, 5.0, 0.0));
+        self.tele_data
+            .push(TelemetryData::new(s!("Accelerometer"), 0.0, 120.0, 0.0));
+        self.tele_data
+            .push(TelemetryData::new(s!("Brake Temperature"), 0.0, 70.0, 30.0));
+        self.tele_data.push(TelemetryData::new(
+            s!("Battery Temperature"),
+            0.0,
+            50.0,
+            25.0,
+        ));
+        self.tele_data
+            .push(TelemetryData::new(s!("Battery Current"), 0.0, 5.0, 0.0));
     }
 
     /// TEMPORARY FUNCTION
@@ -68,7 +80,7 @@ impl TelemetrySvc {
     async fn get_telemetry(&mut self) {
         let gather = match *self.pod_state.lock().await {
             PodState::Unlocked => false,
-            _ => true
+            _ => true,
         };
 
         if gather {

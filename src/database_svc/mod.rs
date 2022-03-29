@@ -28,26 +28,25 @@ impl DatabaseSvc {
         // create/open database
         let conn = Connection::open("openlink.db")?;
 
-        match conn.query_row(
-            "SELECT version FROM db_info WHERE id == 0",
-            [],
-            |row| row.get::<usize, f32>(0)) {
+        match conn.query_row("SELECT version FROM db_info WHERE id == 0", [], |row| {
+            row.get::<usize, f32>(0)
+        }) {
             // database exists, check version and remake if neccessary
             Ok(db_ver) => {
                 if db_ver != DB_VER {
                     schema::cleanup(&conn)?;
                     schema::create(&conn)?;
                 }
-            },
+            }
             // database does not exist, create tables
-            Err(_) => schema::create(&conn)?
+            Err(_) => schema::create(&conn)?,
         }
 
         loop {
             tokio::select! {
                 Some(pkt) = self.rx_auth.recv() => {
                     let res = users::handler(&conn, pkt);
-                    
+
                     if let Err(e) = self.tx_auth.send(res).await {
                         eprintln!("data->auth failed: {}", e);
                     }

@@ -1,25 +1,28 @@
 use anyhow::Result;
 use std::sync::Arc;
-use tokio::{spawn, sync::{mpsc, Mutex}};
+use tokio::{
+    spawn,
+    sync::{mpsc, Mutex},
+};
 
 #[macro_use]
 mod macros;
 
 mod auth_svc;
+mod ctrl_svc;
+mod database_svc;
+mod emerg_svc;
 mod link_svc;
+mod pod_conn_svc;
 mod pod_packet;
 mod pod_packet_payload;
 mod remote_conn_svc;
-mod emerg_svc;
-mod pod_conn_svc;
-mod ctrl_svc;
-mod database_svc;
 mod tele_svc;
 mod trip_svc;
 mod user;
 
-use shared::{remote_conn_packet::*, device::*, launch::LaunchParams};
 use pod_packet::*;
+use shared::{device::*, launch::LaunchParams, remote_conn_packet::*};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -69,7 +72,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // shared memory
     let device_list: Vec<Device> = Vec::new();
     let device_list = Arc::new(Mutex::new(device_list));
-    let launch_params = LaunchParams{ distance: None, max_speed: None };
+    let launch_params = LaunchParams {
+        distance: None,
+        max_speed: None,
+    };
     let pod_state = Arc::new(Mutex::new(pod_conn_svc::PodState::Unlocked));
 
     // Create services with necessary control signals
@@ -101,7 +107,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         launch_params: launch_params,
         pod_state: Arc::clone(&pod_state),
 
-        rx_auth: rx_auth_to_ctrl, 
+        rx_auth: rx_auth_to_ctrl,
         tx_auth: tx_ctrl_to_auth,
 
         rx_pod: rx_pod_to_ctrl,
@@ -110,7 +116,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         tx_trip: tx_ctrl_to_trip,
     };
 
-    let link_svc = link_svc::LinkSvc { 
+    let link_svc = link_svc::LinkSvc {
         device_list: Arc::clone(&device_list),
         pod_state: Arc::clone(&pod_state),
         rx_auth: rx_auth_to_link,
@@ -119,8 +125,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         tx_pod: tx_link_to_pod,
     };
 
-    let remote_conn_svc = remote_conn_svc::RemoteConnSvc { 
-        rx_auth: rx_auth_to_remote, 
+    let remote_conn_svc = remote_conn_svc::RemoteConnSvc {
+        rx_auth: rx_auth_to_remote,
         tx_auth: tx_remote_to_auth,
         tx_emerg: tx_remote_to_emerg,
     };
@@ -169,7 +175,5 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     spawn(database_svc.run());
     spawn(trip_svc.run());
 
-    loop {
-
-    }
+    loop {}
 }

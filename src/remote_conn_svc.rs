@@ -3,10 +3,10 @@ use anyhow::Result;
 use futures_util::stream::StreamExt;
 use quinn::{Endpoint, ServerConfig};
 use std::{error::Error, sync::Arc};
-use tracing::{error, info};
 use tokio::sync::{mpsc::Receiver, mpsc::Sender};
+use tracing::{error, info};
 
-use shared::{remote_conn_packet::*};
+use shared::remote_conn_packet::*;
 
 pub struct RemoteConnSvc {
     pub rx_auth: Receiver<RemotePacket>,
@@ -21,10 +21,16 @@ impl RemoteConnSvc {
         let server_addr = "127.0.0.1:6007".parse().unwrap();
         let (server_config, _server_cert) = self.configure_server().unwrap();
         let (endpoint, mut incoming) = Endpoint::server(server_config, server_addr)?;
-        println!("remote_conn_svc: service running on {}", endpoint.local_addr()?);
+        println!(
+            "remote_conn_svc: service running on {}",
+            endpoint.local_addr()?
+        );
 
         while let Some(conn) = incoming.next().await {
-            println!("remove_conn_svc: remote client connecting from {}", conn.remote_address());
+            println!(
+                "remove_conn_svc: remote client connecting from {}",
+                conn.remote_address()
+            );
             let fut = self.handle_connection(conn);
             if let Err(e) = fut.await {
                 error!("remote_conn_svc: connection failed: {}", e.to_string());
@@ -52,7 +58,7 @@ impl RemoteConnSvc {
         let mut server_config = ServerConfig::with_single_cert(cert_chain, priv_key)?;
         Arc::get_mut(&mut server_config.transport)
             .unwrap()
-            .max_concurrent_uni_streams(0_u8.into())                // force bidirectional streams
+            .max_concurrent_uni_streams(0_u8.into()) // force bidirectional streams
             .max_idle_timeout(Some(std::time::Duration::from_millis(100).try_into()?)) // 100ms timeout
             .keep_alive_interval(std::time::Duration::from_millis(50).into()); // 50ms heartbeat
 
@@ -61,7 +67,11 @@ impl RemoteConnSvc {
 
     /// Takes a connecting client and establishes send and receive streams
     async fn handle_connection(&mut self, conn: quinn::Connecting) -> Result<()> {
-        let quinn::NewConnection {connection: _, mut bi_streams, ..} = conn.await?;
+        let quinn::NewConnection {
+            connection: _,
+            mut bi_streams,
+            ..
+        } = conn.await?;
 
         async {
             info!("established");
@@ -82,7 +92,8 @@ impl RemoteConnSvc {
                 }
             }
             Ok(())
-        }.await?;
+        }
+        .await?;
 
         Ok(())
     }
@@ -90,10 +101,13 @@ impl RemoteConnSvc {
     /// Receive request from RecvStream
     /// Decode buffer into valid OpenLink RemotePacket
     /// Send response on SendStream
-    async fn handle_request(&mut self, (mut send, recv): (quinn::SendStream, quinn::RecvStream)) -> Result<()> {
+    async fn handle_request(
+        &mut self,
+        (mut send, recv): (quinn::SendStream, quinn::RecvStream),
+    ) -> Result<()> {
         let req = match recv.read_to_end(64 * 1024).await {
             Ok(req) => req,
-            Err(e) => encode(RemotePacket::new(0, vec![s!(e)]))
+            Err(e) => encode(RemotePacket::new(0, vec![s!(e)])),
         };
 
         let pkt = decode(req);
@@ -107,12 +121,12 @@ impl RemoteConnSvc {
 
         match send.write_all(&resp).await {
             Ok(()) => (),
-            Err(e) => println!("remote_conn_svc: failed to send response: {}", s!(e))
+            Err(e) => println!("remote_conn_svc: failed to send response: {}", s!(e)),
         }
 
         match send.finish().await {
             Ok(()) => (),
-            Err(e) => println!("remote_conn_svc: failed to shutdown stream: {}", s!(e))
+            Err(e) => println!("remote_conn_svc: failed to shutdown stream: {}", s!(e)),
         }
 
         Ok(())
@@ -127,14 +141,12 @@ impl RemoteConnSvc {
             Ok(()) => {
                 let resp = self.rx_auth.recv().await.unwrap();
                 RemotePacket::new_with_auth(resp.cmd_type, resp.payload, resp.token)
-            },
-            Err(e) => {
-                RemotePacket::new(0, vec![s!(e)])
             }
+            Err(e) => RemotePacket::new(0, vec![s!(e)]),
         };
-        
+
         let res = encode(pkt);
-    
+
         Ok(res)
     }
 }

@@ -1,7 +1,7 @@
-use anyhow::{Result};
-use tokio::sync::{mpsc::Receiver, mpsc::Sender, Mutex};
+use anyhow::Result;
 use serde_json;
-use std::{sync::Arc, ops::Range};
+use std::{ops::Range, sync::Arc};
+use tokio::sync::{mpsc::Receiver, mpsc::Sender, Mutex};
 /* POD STATE COMMANDS
 64 - Get state
 Returns PodState
@@ -13,25 +13,25 @@ Launches pod
 Payload should be a bool to engage/disengage
 */
 
-use shared::{launch::*, remote_conn_packet::*};
 use crate::pod_packet::PodPacket;
 use crate::pod_packet_payload::*;
+use shared::{launch::*, remote_conn_packet::*};
 
 use super::pod_conn_svc::PodState;
 const DIST_RANGE: Range<f32> = 0.0..250.0;
 const SPEED_RANGE: Range<f32> = 0.0..111.0;
 
-pub struct CtrlSvc { 
+pub struct CtrlSvc {
     pub launch_params: LaunchParams,
 
     //State things
     pub pod_state: Arc<Mutex<PodState>>,
 
     //connections to other services
-    pub rx_auth : Receiver<RemotePacket>,
-    pub tx_auth : Sender<RemotePacket>,
+    pub rx_auth: Receiver<RemotePacket>,
+    pub tx_auth: Sender<RemotePacket>,
 
-    pub rx_pod : Receiver<PodPacket>,
+    pub rx_pod: Receiver<PodPacket>,
     pub tx_pod: Sender<PodPacket>,
 
     pub tx_trip: Sender<LaunchParams>,
@@ -74,18 +74,21 @@ impl CtrlSvc {
             Ok(RemotePacket::new(0, vec![s!("Podstate unavailable")]))
         }
     }
-    
+
     /// Launch the pod if in valid state
     async fn launch_pod(&mut self) -> Result<RemotePacket, ()> {
-
         let launch = match *self.pod_state.lock().await {
             PodState::Locked => true,
-            _ => false
+            _ => false,
         };
 
         if launch {
             // send launch command to pod_conn_svc
-            if let Err(e) = self.tx_pod.send(PodPacket::new(254,encode_payload(PodPacketPayload::new()))).await {
+            if let Err(e) = self
+                .tx_pod
+                .send(PodPacket::new(254, encode_payload(PodPacketPayload::new())))
+                .await
+            {
                 eprintln!("ctrl->pod failed: {}", e);
             }
 
@@ -103,22 +106,28 @@ impl CtrlSvc {
 
             println!("Pod launched");
             // return the appropriate ACK packet wrapped in OK()
-            return Ok(RemotePacket::new(69, vec![s!("Pod launched")]))
+            return Ok(RemotePacket::new(69, vec![s!("Pod launched")]));
         } else {
-            return Ok(RemotePacket::new(0, vec![s!("PodState not locked, cannot launch")]))
+            return Ok(RemotePacket::new(
+                0,
+                vec![s!("PodState not locked, cannot launch")],
+            ));
         }
-
     }
 
     /// Engage brakes if in valid state
     async fn engage_brakes(&mut self) -> Result<RemotePacket, ()> {
         let moving = match *self.pod_state.lock().await {
             PodState::Moving => true,
-            _ => false
+            _ => false,
         };
 
         if moving {
-            if let Err(e) = self.tx_pod.send(PodPacket::new(255, encode_payload(PodPacketPayload::new()))).await {
+            if let Err(e) = self
+                .tx_pod
+                .send(PodPacket::new(255, encode_payload(PodPacketPayload::new())))
+                .await
+            {
                 eprintln!("ctrl->pod failed: {}", e);
             }
 
@@ -127,9 +136,12 @@ impl CtrlSvc {
             *self.pod_state.lock().await = PodState::Braking;
             println!("Pod braking");
 
-            return Ok(RemotePacket::new(96, vec![s!("Pod brakes engaged")]))
+            return Ok(RemotePacket::new(96, vec![s!("Pod brakes engaged")]));
         } else {
-            return Ok(RemotePacket::new(0, vec![s!("PodState not moving, cannot brake")]))
+            return Ok(RemotePacket::new(
+                0,
+                vec![s!("PodState not moving, cannot brake")],
+            ));
         }
     }
 
@@ -145,19 +157,31 @@ impl CtrlSvc {
                             Some(s) => {
                                 if SPEED_RANGE.contains(&s) {
                                     self.launch_params = params;
-                                    return Ok(RemotePacket::new(65, vec![s!("Launch parameters set")]))                
+                                    return Ok(RemotePacket::new(
+                                        65,
+                                        vec![s!("Launch parameters set")],
+                                    ));
                                 } else {
-                                    return Ok(RemotePacket::new(0, vec![s!("Max speed out of valid range")]))
+                                    return Ok(RemotePacket::new(
+                                        0,
+                                        vec![s!("Max speed out of valid range")],
+                                    ));
                                 }
                             }
                         }
                     } else {
-                        return Ok(RemotePacket::new(0, vec![s!("Distance out of valid range")]))
+                        return Ok(RemotePacket::new(
+                            0,
+                            vec![s!("Distance out of valid range")],
+                        ));
                     }
                 }
             }
         } else {
-            return Ok(RemotePacket::new(0, vec![s!("Launch parameters not set, malformed")]))
+            return Ok(RemotePacket::new(
+                0,
+                vec![s!("Launch parameters not set, malformed")],
+            ));
         }
     }
 }
