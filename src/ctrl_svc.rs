@@ -14,8 +14,8 @@ Payload should be a bool to engage/disengage
 */
 
 use crate::pod_packet::PodPacket;
-use crate::pod_packet_payload::*;
-use shared::{launch::*, remote_conn_packet::*};
+use crate::pod_packet_payload::{encode_payload, PodPacketPayload};
+use shared::{launch::LaunchParams, remote_conn_packet::RemotePacket};
 
 use super::pod_conn_svc::PodState;
 const DIST_RANGE: Range<f32> = 0.0..250.0;

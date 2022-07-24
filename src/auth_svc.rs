@@ -3,8 +3,8 @@ use boringauth::pass::is_valid;
 use serde::{Deserialize, Serialize};
 use tokio::sync::{mpsc::Receiver, mpsc::Sender};
 
-use super::user::User;
-use shared::{login::LoginCredentials, remote_conn_packet::*};
+use crate::user::User;
+use shared::{login::LoginCredentials, remote_conn_packet::RemotePacket};
 
 const SECRET_KEY: &[u8; 8] = b"openlink";
 

@@ -21,8 +21,8 @@ mod tele_svc;
 mod trip_svc;
 mod user;
 
-use pod_packet::*;
-use shared::{device::*, launch::LaunchParams, remote_conn_packet::*};
+use pod_packet::PodPacket;
+use shared::{device::Device, launch::LaunchParams, remote_conn_packet::RemotePacket};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {

@@ -6,7 +6,7 @@ use std::{error::Error, sync::Arc};
 use tokio::sync::{mpsc::Receiver, mpsc::Sender};
 use tracing::{error, info};
 
-use shared::remote_conn_packet::*;
+use shared::remote_conn_packet::{decode, encode, RemotePacket};
 
 pub struct RemoteConnSvc {
     pub rx_auth: Receiver<RemotePacket>,

@@ -5,7 +5,7 @@ use tokio::{
     time::{sleep, Duration},
 };
 
-use super::pod_conn_svc::PodState;
+use crate::pod_conn_svc::PodState;
 use shared::launch::*;
 
 pub struct TripSvc {

@@ -6,8 +6,8 @@ use tokio::{
     time::{self, Duration},
 };
 
-use super::pod_conn_svc::PodState;
-use shared::{remote_conn_packet::*, telemetry::*};
+use crate::pod_conn_svc::PodState;
+use shared::{remote_conn_packet::RemotePacket, telemetry::TelemetryData};
 
 pub struct TelemetrySvc {
     pub pod_state: Arc<Mutex<PodState>>,
