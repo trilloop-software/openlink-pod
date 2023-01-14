@@ -20,13 +20,13 @@ impl RemoteConnSvc {
     pub async fn run(mut self) -> Result<()> {
         let server_addr = "127.0.0.1:6007".parse().unwrap();
         let (server_config, _server_cert) = self.configure_server().unwrap();
-        let (endpoint, mut incoming) = Endpoint::server(server_config, server_addr)?;
+        let endpoint = Endpoint::server(server_config, server_addr)?;
         println!(
             "remote_conn_svc: service running on {}",
             endpoint.local_addr()?
         );
 
-        while let Some(conn) = incoming.next().await {
+        while let Some(conn) = endpoint.accept().await {
             println!(
                 "remove_conn_svc: remote client connecting from {}",
                 conn.remote_address()
@@ -67,15 +67,19 @@ impl RemoteConnSvc {
 
     /// Takes a connecting client and establishes send and receive streams
     async fn handle_connection(&mut self, conn: quinn::Connecting) -> Result<()> {
-        let quinn::NewConnection {
-            connection: _,
-            mut bi_streams,
-            ..
-        } = conn.await?;
+        // let quinn::Connection {
+        //     connection: _,
+        //     mut bi_streams,
+        //     ..
+        // } = conn.await?;
+
+        let connection = conn.await?;
 
         async {
             info!("established");
-            while let Some(stream) = bi_streams.next().await {
+            // while let Some(stream) = bi_streams.next().await {
+            loop {
+                let stream = connection.accept_bi().await;
                 let stream = match stream {
                     Err(quinn::ConnectionError::ApplicationClosed { .. }) => {
                         info!("connection closed");
@@ -91,7 +95,6 @@ impl RemoteConnSvc {
                     error!("failed: {}", e.to_string());
                 }
             }
-            Ok(())
         }
         .await?;
 
