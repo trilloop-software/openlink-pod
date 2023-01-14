@@ -67,17 +67,10 @@ impl RemoteConnSvc {
 
     /// Takes a connecting client and establishes send and receive streams
     async fn handle_connection(&mut self, conn: quinn::Connecting) -> Result<()> {
-        // let quinn::Connection {
-        //     connection: _,
-        //     mut bi_streams,
-        //     ..
-        // } = conn.await?;
-
         let connection = conn.await?;
 
         async {
             info!("established");
-            // while let Some(stream) = bi_streams.next().await {
             loop {
                 let stream = connection.accept_bi().await;
                 let stream = match stream {
